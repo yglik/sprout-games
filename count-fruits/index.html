@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Count the Fruit!</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #ffe9c7;
+    touch-action: none;
+  }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+let W = 0, H = 0;
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+resize();
+window.addEventListener('resize', () => { resize(); layoutFruit(); });
+
+function rand(a, b) { return a + Math.random() * (b - a); }
+
+/* ---------- fruit drawing (all centred on 0,0 with radius ~r) ---------- */
+function banana(r) {
+  ctx.fillStyle = '#ffd93d';
+  ctx.strokeStyle = '#d9a406';
+  ctx.lineWidth = r * 0.13;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.85, -r * 0.35);
+  ctx.quadraticCurveTo(-r * 0.2, r * 1.0, r * 0.9, r * 0.15);
+  ctx.quadraticCurveTo(r * 0.2, r * 0.55, -r * 0.55, -r * 0.55);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#8a6212';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.8, -r * 0.48, r * 0.14, r * 0.1, -0.7, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function apple(r) {
+  ctx.fillStyle = '#e8342c';
+  ctx.strokeStyle = '#b31f1a';
+  ctx.lineWidth = r * 0.11;
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.55);
+  ctx.bezierCurveTo(-r * 1.15, -r * 1.15, -r * 1.05, r * 0.95, 0, r * 0.9);
+  ctx.bezierCurveTo(r * 1.05, r * 0.95, r * 1.15, -r * 1.15, 0, -r * 0.55);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.strokeStyle = '#7a4a1f';
+  ctx.lineWidth = r * 0.14;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.6);
+  ctx.quadraticCurveTo(r * 0.1, -r * 1.05, r * 0.28, -r * 1.15);
+  ctx.stroke();
+
+  ctx.fillStyle = '#4ea83f';
+  ctx.beginPath();
+  ctx.ellipse(r * 0.42, -r * 0.95, r * 0.32, r * 0.16, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.38, -r * 0.25, r * 0.2, r * 0.32, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function orange(r) {
+  ctx.fillStyle = '#ff9f1c';
+  ctx.strokeStyle = '#d97706';
+  ctx.lineWidth = r * 0.11;
+  ctx.beginPath();
+  ctx.arc(0, r * 0.05, r * 0.92, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(217,119,6,0.35)';
+  for (let i = 0; i < 7; i++) {
+    const a = i * 2.4;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * r * 0.45, r * 0.05 + Math.sin(a) * r * 0.45, r * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#4ea83f';
+  ctx.beginPath();
+  ctx.ellipse(r * 0.3, -r * 0.85, r * 0.34, r * 0.16, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.35, -r * 0.3, r * 0.2, r * 0.28, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function strawberry(r) {
+  ctx.fillStyle = '#f0384a';
+  ctx.strokeStyle = '#b91c2c';
+  ctx.lineWidth = r * 0.1;
+  ctx.beginPath();
+  ctx.moveTo(0, r);
+  ctx.bezierCurveTo(-r * 1.05, r * 0.25, -r * 0.9, -r * 0.75, 0, -r * 0.62);
+  ctx.bezierCurveTo(r * 0.9, -r * 0.75, r * 1.05, r * 0.25, 0, r);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffe9a8';
+  for (let i = 0; i < 8; i++) {
+    const a = -1.4 + i * 0.85;
+    const rr = r * (0.2 + (i % 3) * 0.2);
+    ctx.beginPath();
+    ctx.ellipse(Math.cos(a) * rr, Math.sin(a) * rr * 0.9, r * 0.07, r * 0.045, a, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#4ea83f';
+  for (let i = -2; i <= 2; i++) {
+    ctx.save();
+    ctx.translate(0, -r * 0.6);
+    ctx.rotate(i * 0.45);
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 0.2, r * 0.16, r * 0.36, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.strokeStyle = '#3f8f34';
+  ctx.lineWidth = r * 0.12;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.7);
+  ctx.lineTo(0, -r * 1.15);
+  ctx.stroke();
+}
+
+function grapes(r) {
+  ctx.strokeStyle = '#7a4a1f';
+  ctx.lineWidth = r * 0.12;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.65);
+  ctx.lineTo(0, -r * 1.1);
+  ctx.stroke();
+
+  ctx.fillStyle = '#4ea83f';
+  ctx.beginPath();
+  ctx.ellipse(r * 0.36, -r * 0.95, r * 0.3, r * 0.14, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rows = [3, 3, 2, 1];
+  const br = r * 0.3;
+  let y = -r * 0.45;
+  for (const n of rows) {
+    for (let i = 0; i < n; i++) {
+      const x = (i - (n - 1) / 2) * br * 1.75;
+      ctx.fillStyle = '#8b5cf6';
+      ctx.strokeStyle = '#5b21b6';
+      ctx.lineWidth = r * 0.07;
+      ctx.beginPath();
+      ctx.arc(x, y, br, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      ctx.arc(x - br * 0.3, y - br * 0.35, br * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    y += br * 1.5;
+  }
+}
+
+const FRUITS = [
+  { draw: banana, one: 'banana', many: 'bananas' },
+  { draw: apple, one: 'apple', many: 'apples' },
+  { draw: orange, one: 'orange', many: 'oranges' },
+  { draw: strawberry, one: 'strawberry', many: 'strawberries' },
+  { draw: grapes, one: 'grape', many: 'grapes' }
+];
+
+/* ---------- sound ---------- */
+let audio = null;
+function tone(freq, dur, type, delay) {
+  try {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+    const t0 = audio.currentTime + (delay || 0);
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(0.2, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain).connect(audio.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+  } catch (err) { /* no sound, no problem */ }
+}
+function cheer() {
+  [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.22, 'sine', i * 0.09));
+}
+function nope() {
+  tone(200, 0.18, 'triangle');
+  tone(160, 0.22, 'triangle', 0.12);
+}
+
+/* ---------- game state ---------- */
+let target = -1;
+let fruit = FRUITS[0];
+let items = [];
+let stars = 0;
+let shake = 0;          // 1 -> 0 after a wrong key
+let wrongKey = -1;
+let celebrate = 0;      // seconds left of the little party
+let confetti = [];
+let bornAt = 0;
+
+const FRUIT_TOP = () => H * 0.40;
+
+function layoutFruit() {
+  const n = target;
+  if (n === 0) { items = []; return; }
+  const areaTop = FRUIT_TOP();
+  const areaH = H * 0.42;
+  const cols = n <= 3 ? n : (n <= 8 ? Math.ceil(n / 2) : 3);
+  const rows = Math.ceil(n / cols);
+  const cellW = Math.min(W * 0.8 / cols, 150);
+  const cellH = Math.min(areaH / rows, 130);
+  const r = Math.min(cellW, cellH) * 0.36;
+
+  items = [];
+  for (let i = 0; i < n; i++) {
+    const row = Math.floor(i / cols);
+    const inRow = Math.min(cols, n - row * cols);
+    const idx = i - row * cols;
+    items.push({
+      x: W / 2 + (idx - (inRow - 1) / 2) * cellW,
+      y: areaTop + cellH * 0.5 + row * cellH + (rows > 1 ? (areaH - rows * cellH) / 2 : areaH * 0.15),
+      r: r,
+      seed: Math.random() * 10,
+      tilt: rand(-0.18, 0.18),
+      pop: i * 0.07
+    });
+  }
+}
+
+function newRound() {
+  let n;
+  do { n = Math.floor(Math.random() * 10); } while (n === target);
+  target = n;
+  fruit = FRUITS[Math.floor(Math.random() * FRUITS.length)];
+  wrongKey = -1;
+  bornAt = performance.now();
+  layoutFruit();
+}
+
+function answer(n) {
+  if (celebrate > 0) return;
+  if (n === target) {
+    stars++;
+    celebrate = 1.1;
+    cheer();
+    for (let i = 0; i < 70; i++) {
+      confetti.push({
+        x: W / 2 + rand(-60, 60),
+        y: H * 0.25,
+        vx: rand(-320, 320),
+        vy: rand(-520, -180),
+        r: rand(4, 9),
+        rot: rand(0, 6.3),
+        vr: rand(-8, 8),
+        life: 1,
+        color: ['#e8342c', '#ffd93d', '#4ea83f', '#8b5cf6', '#ff9f1c', '#38bdf8'][i % 6]
+      });
+    }
+  } else {
+    shake = 1;
+    wrongKey = n;
+    nope();
+  }
+}
+
+window.addEventListener('keydown', e => {
+  if (e.key >= '0' && e.key <= '9') {
+    e.preventDefault();
+    if (!e.repeat) answer(+e.key);
+  }
+});
+
+/* ---------- on-screen keypad (also works for taps) ---------- */
+function padGeom() {
+  const y = H - 90;
+  const size = Math.min(64, (W - 40) / 10 - 6);
+  const step = size + 6;
+  return { y, size, step, x0: W / 2 - (step * 10 - 6) / 2 };
+}
+canvas.addEventListener('pointerdown', e => {
+  const g = padGeom();
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  for (let d = 0; d <= 9; d++) {
+    const x = g.x0 + d * g.step;
+    if (px >= x && px <= x + g.size && py >= g.y && py <= g.y + g.size) { answer(d); return; }
+  }
+  if (!audio) tone(880, 0.001);   // unlock audio on first tap
+});
+
+/* ---------- drawing ---------- */
+function drawBackground(t) {
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#ffe9c7');
+  sky.addColorStop(1, '#ffd0a1');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  for (let i = 0; i < 6; i++) {
+    const x = ((i * 260 + t / 60) % (W + 300)) - 150;
+    const y = 60 + (i % 3) * 90;
+    ctx.beginPath();
+    ctx.arc(x, y, 40, 0, Math.PI * 2);
+    ctx.arc(x + 42, y + 6, 30, 0, Math.PI * 2);
+    ctx.arc(x - 40, y + 8, 26, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawNumber(t) {
+  const size = Math.min(H * 0.24, W * 0.28);
+  const cx = W / 2 + (shake > 0 ? Math.sin(t / 22) * 14 * shake : 0);
+  const cy = H * 0.21;
+  const pop = Math.min(1, (t - bornAt) / 260);
+  const s = celebrate > 0
+    ? 1 + Math.sin((1.1 - celebrate) * 12) * 0.08
+    : 0.6 + 0.4 * (1 - Math.pow(1 - pop, 3)) + Math.sin(pop * Math.PI) * 0.12;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(s, s);
+
+  const w = size * 1.0, h = size * 1.12;
+  ctx.fillStyle = shake > 0 ? 'rgba(255,220,220,0.95)' : 'rgba(255,255,255,0.85)';
+  ctx.strokeStyle = shake > 0 ? '#e8342c' : '#fff';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.roundRect(-w / 2, -h / 2, w, h, 32);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.font = 'bold ' + Math.round(size) + 'px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#33242e';
+  ctx.fillText(String(target), 0, size * 0.04);
+  ctx.restore();
+}
+
+function drawItems(t) {
+  items.forEach((it, i) => {
+    const age = (t - bornAt) / 1000 - it.pop;
+    if (age < 0) return;
+    const grow = Math.min(1, age / 0.28);
+    const s = 0.3 + 0.7 * (1 - Math.pow(1 - grow, 3)) + Math.sin(grow * Math.PI) * 0.2;
+    const hop = celebrate > 0 ? Math.abs(Math.sin(t / 110 + i)) * -18 : Math.sin(t / 620 + it.seed) * 4;
+    ctx.save();
+    ctx.translate(it.x, it.y + hop);
+
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(0, it.r * 1.25 - hop * 0.6, it.r * 0.8, it.r * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.rotate(it.tilt + Math.sin(t / 700 + it.seed) * 0.05);
+    ctx.scale(s, s);
+    fruit.draw(it.r);
+    ctx.restore();
+  });
+
+  if (target === 0) {
+    // an empty plate, so "zero" has something to look at
+    const cx = W / 2, cy = FRUIT_TOP() + H * 0.14;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.strokeStyle = '#e0b184';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 105, 34, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 72, 21, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function drawStars() {
+  const n = Math.min(stars, 10);
+  for (let i = 0; i < n; i++) {
+    const x = 34 + i * 34, y = 34;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = '#ffd93d';
+    ctx.strokeStyle = '#e0a800';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let k = 0; k < 10; k++) {
+      const rr = k % 2 ? 6 : 14;
+      const a = -Math.PI / 2 + (k * Math.PI) / 5;
+      const fn = k ? 'lineTo' : 'moveTo';
+      ctx[fn](Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (stars > 10) {
+    ctx.fillStyle = '#33242e';
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('+' + (stars - 10), 34 + 10 * 34 - 12, 34);
+  }
+}
+
+function drawPad(t) {
+  const g = padGeom();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let d = 0; d <= 9; d++) {
+    const x = g.x0 + d * g.step;
+    const bad = wrongKey === d && shake > 0;
+    ctx.fillStyle = bad ? 'rgba(232,52,44,0.85)' : 'rgba(255,255,255,0.7)';
+    ctx.strokeStyle = bad ? '#b31f1a' : 'rgba(255,255,255,0.95)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(x, g.y, g.size, g.size, 14);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = bad ? '#fff' : '#33242e';
+    ctx.font = 'bold ' + Math.round(g.size * 0.5) + 'px system-ui, sans-serif';
+    ctx.fillText(String(d), x + g.size / 2, g.y + g.size / 2 + 1);
+  }
+}
+
+function drawHint() {
+  ctx.fillStyle = 'rgba(51,36,46,0.6)';
+  ctx.font = 'bold 22px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  const msg = celebrate > 0
+    ? 'Yes!  ' + target + ' ' + (target === 1 ? fruit.one : fruit.many) + '!'
+    : 'How many? Press the number!';
+  ctx.fillText(msg, W / 2, H - 110);
+}
+
+/* ---------- loop ---------- */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+  if (shake > 0) shake = Math.max(0, shake - dt * 2.2);
+  if (celebrate > 0) {
+    celebrate -= dt;
+    if (celebrate <= 0) { celebrate = 0; newRound(); }
+  }
+
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    const c = confetti[i];
+    c.x += c.vx * dt;
+    c.y += c.vy * dt;
+    c.vy += 900 * dt;
+    c.rot += c.vr * dt;
+    c.life -= dt * 0.5;
+    if (c.life <= 0 || c.y > H + 40) confetti.splice(i, 1);
+  }
+
+  drawBackground(now);
+  drawNumber(now);
+  drawItems(now);
+  drawStars();
+  drawHint();
+  drawPad(now);
+
+  for (const c of confetti) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, c.life));
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.rot);
+    ctx.fillStyle = c.color;
+    ctx.fillRect(-c.r / 2, -c.r / 2, c.r, c.r * 1.6);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+
+  requestAnimationFrame(loop);
+}
+
+newRound();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

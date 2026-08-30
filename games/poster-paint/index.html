@@ -138,7 +138,13 @@ function ryb2rgb(r, y, b) {
   return out;
 }
 
-/* ---------- palette: 9 basic poster-paint colors, as pigment recipes ---------- */
+/* ---------- palette: 9 basic poster-paint colors, as pigment recipes ---------- *
+ * `cover` is how fast this paint *displaces* pigment already on the paper.
+ * Low for real pigments, so brushing yellow onto wet blue leaves the blue in
+ * place and the two combine into green. White is opaque cover-up paint, so it
+ * wipes what's underneath instead of tinting it.
+ */
+const COVER = 0.15;
 const PALETTE = [
   { ryb: [1, 0, 0] },              // red
   { ryb: [1, 1, 0] },              // orange
@@ -148,10 +154,10 @@ const PALETTE = [
   { ryb: [1, 0, 1] },              // purple
   { ryb: [0.68, 0.67, 0.58] },     // brown
   { ryb: [1, 1, 1] },              // black
-  { ryb: [0, 0, 0] }               // white
+  { ryb: [0, 0, 0], cover: 1 }     // white
 ];
 
-let currentRYB = PALETTE[0].ryb;
+let current = PALETTE[0];
 
 const paletteEl = document.getElementById('palette');
 PALETTE.forEach((c, i) => {
@@ -161,7 +167,7 @@ PALETTE.forEach((c, i) => {
   btn.style.background = `rgb(${r},${g},${b})`;
   btn.addEventListener('pointerdown', ev => {
     ev.preventDefault();
-    currentRYB = c.ryb;
+    current = c;
     paletteEl.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
     btn.classList.add('selected');
   });
@@ -183,7 +189,18 @@ function initGrid() {
   gridB = new Float32Array(gridW * gridH);
 }
 
-function depositAt(x, y, ryb) {
+/* One channel of one cell. Pigment arriving raises a channel at full speed;
+ * pigment already on the paper only fades at `cover` speed. That asymmetry is
+ * what makes yellow-over-blue settle at "lots of yellow AND still lots of
+ * blue" — which the RYB model then reads out as green. */
+function mixChannel(arr, idx, target, strength, cover) {
+  const old = arr[idx];
+  const rate = target > old ? strength : strength * cover;
+  arr[idx] = old + (target - old) * rate;
+}
+
+function depositAt(x, y, paint) {
+  const ryb = paint.ryb, cover = paint.cover === undefined ? COVER : paint.cover;
   const cx = x / CELL, cy = y / CELL;
   const rad = BRUSH_R / CELL;
   const x0 = Math.max(0, Math.floor(cx - rad)), x1 = Math.min(gridW - 1, Math.ceil(cx + rad));
@@ -195,9 +212,9 @@ function depositAt(x, y, ryb) {
       if (dist > rad) continue;
       const strength = DEPOSIT * (1 - dist / rad);
       const idx = gy * gridW + gx;
-      gridR[idx] += (ryb[0] - gridR[idx]) * strength;
-      gridY[idx] += (ryb[1] - gridY[idx]) * strength;
-      gridB[idx] += (ryb[2] - gridB[idx]) * strength;
+      mixChannel(gridR, idx, ryb[0], strength, cover);
+      mixChannel(gridY, idx, ryb[1], strength, cover);
+      mixChannel(gridB, idx, ryb[2], strength, cover);
     }
   }
   return ryb2rgb(sampleGrid(gridR, cx, cy), sampleGrid(gridY, cx, cy), sampleGrid(gridB, cx, cy));
@@ -238,7 +255,7 @@ function newBristles(cx, cy) {
 function renderDab(x, y, rgb) {
   const css = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
 
-  ctx.globalAlpha = 0.62;
+  ctx.globalAlpha = 0.88;
   ctx.fillStyle = css;
   ctx.beginPath();
   ctx.arc(x, y, BRUSH_R * 0.85, 0, Math.PI * 2);
@@ -264,7 +281,7 @@ function renderDab(x, y, rgb) {
 }
 
 function depositAndRender(x, y) {
-  renderDab(x, y, depositAt(x, y, currentRYB));
+  renderDab(x, y, depositAt(x, y, current));
 }
 
 let lastPt = null;

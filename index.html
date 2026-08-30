@@ -49,8 +49,9 @@ const basket = { x: 0, y: 0, tilt: 0 };
 let plants = [];
 let collected = [];         // every picked item, in order: { cropIdx, born }
 let pile = [];              // the few riding inside the basket
-let flyers = [];            // items arcing from plant to basket
 let pops = [];              // juice splashes
+let busy = false;           // true while a picked item is on its showcase trip
+let showcase = null;        // the item currently center-stage: { cropIdx, phase, x, y, r, ... }
 
 function rand(a, b) { return a + Math.random() * (b - a); }
 
@@ -287,6 +288,25 @@ function speakInstructionsFallback() {
   } catch (err) { /* no speech, no problem */ }
 }
 
+/* ---------- each crop's own sound, played while it's shown center-stage ---------- */
+const cropAudioCache = {};
+function playCropSound(cropIdx, onDone) {
+  const id = CROPS[cropIdx].id;
+  let a = cropAudioCache[id];
+  if (!a) { a = new Audio(id + '.m4a'); cropAudioCache[id] = a; }
+  let done = false;
+  const finish = () => { if (done) return; done = true; onDone(); };
+  const safety = setTimeout(finish, 3000);
+  a.onended = () => { clearTimeout(safety); finish(); };
+  try {
+    a.currentTime = 0;
+    a.play().catch(() => { clearTimeout(safety); setTimeout(finish, 800); });
+  } catch (err) {
+    clearTimeout(safety);
+    setTimeout(finish, 800);
+  }
+}
+
 /* ---------- picking ---------- */
 function nearestProduce(onlyRipe) {
   let best = null, bestD = PICK_RANGE;
@@ -302,13 +322,22 @@ function nearestProduce(onlyRipe) {
 }
 
 function pick() {
+  if (busy) return;
   const hit = nearestProduce(true);
   if (hit) {
     const item = hit.item;
     item.picked = true;
-    const r = produceRadius(item);
+    busy = true;
+    const r0 = produceRadius(item);
     const x = hit.plant.x + item.ox, y = hit.plant.y + item.oy;
-    flyers.push({ x0: x, y0: y, x, y, r, k: 0, cropIdx: item.cropIdx });
+    showcase = {
+      cropIdx: item.cropIdx,
+      phase: 'toCenter',
+      k: 0,
+      x0: x, y0: y, x, y,
+      r0, r: r0,
+      bigR: Math.max(70, Math.min(W, H) * 0.22)
+    };
     for (let i = 0; i < 8; i++) {
       pops.push({ x, y, life: 1, vx: rand(-90, 90), vy: rand(-160, -40), r: rand(3, 6) });
     }
@@ -320,6 +349,60 @@ function pick() {
     green.item.wobble = 1;
     beep(240, 0.15, 'triangle');
   }
+}
+
+/* ---------- showcase: enlarge picked item at screen center, say its name, then deliver it ---------- */
+function updateShowcase(dt, now) {
+  if (!showcase) return;
+  const s = showcase;
+
+  if (s.phase === 'toCenter') {
+    s.k = Math.min(1, s.k + dt / 0.45);
+    const e = 1 - Math.pow(1 - s.k, 3);
+    s.x = s.x0 + (W / 2 - s.x0) * e;
+    s.y = s.y0 + (H / 2 - s.y0) * e;
+    s.r = s.r0 + (s.bigR - s.r0) * e;
+    if (s.k >= 1) {
+      s.phase = 'hold';
+      s.x = W / 2; s.y = H / 2; s.r = s.bigR;
+      playCropSound(s.cropIdx, () => {
+        if (showcase === s) { s.phase = 'toBasket'; s.k = 0; s.fromX = s.x; s.fromY = s.y; }
+      });
+    }
+  } else if (s.phase === 'toBasket') {
+    s.k = Math.min(1, s.k + dt / 0.5);
+    const e = 1 - Math.pow(1 - s.k, 3);
+    const tx = basket.x, ty = basket.y - BH + 6;
+    s.x = s.fromX + (tx - s.fromX) * e;
+    s.y = s.fromY + (ty - s.fromY) * e - Math.sin(e * Math.PI) * 70;
+    s.r = s.bigR + (s.r0 - s.bigR) * e;
+    if (s.k >= 1) {
+      collected.push({ cropIdx: s.cropIdx, born: now });
+      pile.push({ px: rand(-BW * 0.55, BW * 0.55), py: rand(-6, 4), cropIdx: s.cropIdx });
+      if (pile.length > 7) pile.shift();
+      beep(990, 0.14);
+      showcase = null;
+      busy = false;
+    }
+  }
+  // phase 'hold': waiting on playCropSound's callback, nothing to advance here
+}
+
+function drawShowcase(now) {
+  if (!showcase) return;
+  const s = showcase;
+
+  if (s.phase === 'hold' || (s.phase === 'toCenter' && s.k > 0.6)) {
+    const dim = s.phase === 'hold' ? 0.35 : ((s.k - 0.6) / 0.4) * 0.35;
+    ctx.fillStyle = 'rgba(0,0,0,' + dim + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  const bob = s.phase === 'hold' ? Math.sin(now / 180) * 6 : 0;
+  ctx.save();
+  ctx.translate(s.x, s.y + bob);
+  CROPS[s.cropIdx].draw(s.r, true, 1);
+  ctx.restore();
 }
 
 /* ---------- drawing ---------- */
@@ -629,22 +712,7 @@ function loop(now) {
     }
   }
 
-  // produce arcs from the plant into the basket
-  for (let i = flyers.length - 1; i >= 0; i--) {
-    const f = flyers[i];
-    f.k += dt * 1.6;
-    const k = Math.min(1, f.k);
-    const tx = basket.x, ty = basket.y - BH + 6;
-    f.x = f.x0 + (tx - f.x0) * k;
-    f.y = f.y0 + (ty - f.y0) * k - Math.sin(k * Math.PI) * 70;
-    if (k >= 1) {
-      flyers.splice(i, 1);
-      collected.push({ cropIdx: f.cropIdx, born: now });
-      pile.push({ px: rand(-BW * 0.55, BW * 0.55), py: rand(-6, 4), cropIdx: f.cropIdx });
-      if (pile.length > 7) pile.shift();
-      beep(990, 0.14);
-    }
-  }
+  updateShowcase(dt, now);
 
   for (let i = pops.length - 1; i >= 0; i--) {
     const s = pops[i];
@@ -665,14 +733,6 @@ function loop(now) {
   }
   if (!drawnBasket) drawBasket(now);
 
-  for (const f of flyers) {
-    ctx.save();
-    ctx.translate(f.x, f.y);
-    ctx.rotate(f.k * 4);
-    CROPS[f.cropIdx].draw(f.r, true, 1);
-    ctx.restore();
-  }
-
   ctx.fillStyle = '#e8342c';
   for (const s of pops) {
     ctx.globalAlpha = Math.max(0, s.life);
@@ -681,6 +741,8 @@ function loop(now) {
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+
+  drawShowcase(now);
 
   drawTray(now);
   drawKeyboard();

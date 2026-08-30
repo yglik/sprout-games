@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Poster Paint!</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: #f4ede1;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .app {
+    display: flex;
+    height: 100%;
+    width: 100%;
+  }
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: clamp(76px, 10vw, 100px);
+    flex: 0 0 auto;
+    padding: 14px 0;
+    background: #efe4d3;
+    border-right: 3px solid #d9c8ab;
+  }
+  .palette {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    align-items: center;
+    flex: 1;
+    width: 100%;
+    gap: 4px;
+  }
+  .swatch {
+    width: clamp(36px, 8vh, 58px);
+    height: clamp(36px, 8vh, 58px);
+    border-radius: 50%;
+    border: 3px solid rgba(0,0,0,0.18);
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.18);
+  }
+  .swatch.selected {
+    border-color: #33242e;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px #33242e, 0 2px 4px rgba(0,0,0,0.25);
+  }
+  .divider {
+    width: 70%;
+    height: 3px;
+    background: #d9c8ab;
+    border-radius: 2px;
+    margin: 10px 0;
+    flex: 0 0 auto;
+  }
+  .clear-btn {
+    flex: 0 0 auto;
+    width: clamp(40px, 7vh, 52px);
+    height: clamp(40px, 7vh, 52px);
+    border-radius: 50%;
+    border: 3px solid #c9b58f;
+    background: #fff9ee;
+    font-size: clamp(18px, 4vh, 24px);
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.15);
+  }
+  .canvas-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="palette" id="palette"></div>
+    <div class="divider"></div>
+    <button class="clear-btn" id="clearBtn" aria-label="Clear painting">🧹</button>
+  </div>
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="game"></canvas>
+  </div>
+</div>
+<script>
+const wrap = document.getElementById('canvasWrap');
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d', { willReadFrequently: false });
+
+/* ---------- RYB (artist's paint) color model ---------- *
+ * Classic 8-corner RYB<->RGB cube, trilinearly interpolated, so
+ * mixing pigments behaves like real paint: blue + yellow = green,
+ * red + blue = purple, red + yellow = orange, all three -> dark brown.
+ */
+const RYB_CORNERS = {
+  white:  [1, 1, 1],
+  red:    [1, 0, 0],
+  yellow: [1, 1, 0],
+  blue:   [0.163, 0.373, 0.6],
+  orange: [1, 0.5, 0],
+  purple: [0.5, 0, 0.5],
+  green:  [0, 0.66, 0.2],
+  black:  [0.2, 0.094, 0]
+};
+function lerp(a, b, t) { return a + (b - a) * t; }
+function ryb2rgb(r, y, b) {
+  r = Math.max(0, Math.min(1, r));
+  y = Math.max(0, Math.min(1, y));
+  b = Math.max(0, Math.min(1, b));
+  const c000 = RYB_CORNERS.white, c100 = RYB_CORNERS.red, c010 = RYB_CORNERS.yellow,
+        c001 = RYB_CORNERS.blue, c110 = RYB_CORNERS.orange, c101 = RYB_CORNERS.purple,
+        c011 = RYB_CORNERS.green, c111 = RYB_CORNERS.black;
+  const out = [0, 0, 0];
+  for (let k = 0; k < 3; k++) {
+    const c00 = lerp(c000[k], c100[k], r), c10 = lerp(c010[k], c110[k], r);
+    const c01 = lerp(c001[k], c101[k], r), c11 = lerp(c011[k], c111[k], r);
+    const c0 = lerp(c00, c10, y), c1 = lerp(c01, c11, y);
+    out[k] = Math.round(Math.max(0, Math.min(1, lerp(c0, c1, b))) * 255);
+  }
+  return out;
+}
+
+/* ---------- palette: 9 basic poster-paint colors, as pigment recipes ---------- */
+const PALETTE = [
+  { ryb: [1, 0, 0] },              // red
+  { ryb: [1, 1, 0] },              // orange
+  { ryb: [0, 1, 0] },              // yellow
+  { ryb: [0, 1, 1] },              // green
+  { ryb: [0, 0, 1] },              // blue
+  { ryb: [1, 0, 1] },              // purple
+  { ryb: [0.68, 0.67, 0.58] },     // brown
+  { ryb: [1, 1, 1] },              // black
+  { ryb: [0, 0, 0] }               // white
+];
+
+let currentRYB = PALETTE[0].ryb;
+
+const paletteEl = document.getElementById('palette');
+PALETTE.forEach((c, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'swatch' + (i === 0 ? ' selected' : '');
+  const [r, g, b] = ryb2rgb(c.ryb[0], c.ryb[1], c.ryb[2]);
+  btn.style.background = `rgb(${r},${g},${b})`;
+  btn.addEventListener('pointerdown', ev => {
+    ev.preventDefault();
+    currentRYB = c.ryb;
+    paletteEl.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
+    btn.classList.add('selected');
+  });
+  paletteEl.appendChild(btn);
+});
+
+/* ---------- pigment memory grid: coarse cells hold the "wet" mixed color ---------- */
+const CELL = 6;          // CSS px per pigment cell
+const DEPOSIT = 0.85;      // how strongly one dab shifts a cell toward the brush color
+const BRUSH_R = 20;       // fixed brush radius, CSS px — one brush, one size
+
+let W = 0, H = 0;
+let gridW = 1, gridH = 1, gridR, gridY, gridB;
+function initGrid() {
+  gridW = Math.max(1, Math.ceil(W / CELL));
+  gridH = Math.max(1, Math.ceil(H / CELL));
+  gridR = new Float32Array(gridW * gridH);
+  gridY = new Float32Array(gridW * gridH);
+  gridB = new Float32Array(gridW * gridH);
+}
+
+function depositAt(x, y, ryb) {
+  const cx = x / CELL, cy = y / CELL;
+  const rad = BRUSH_R / CELL;
+  const x0 = Math.max(0, Math.floor(cx - rad)), x1 = Math.min(gridW - 1, Math.ceil(cx + rad));
+  const y0 = Math.max(0, Math.floor(cy - rad)), y1 = Math.min(gridH - 1, Math.ceil(cy + rad));
+  for (let gy = y0; gy <= y1; gy++) {
+    for (let gx = x0; gx <= x1; gx++) {
+      const dx = gx - cx, dy = gy - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > rad) continue;
+      const strength = DEPOSIT * (1 - dist / rad);
+      const idx = gy * gridW + gx;
+      gridR[idx] += (ryb[0] - gridR[idx]) * strength;
+      gridY[idx] += (ryb[1] - gridY[idx]) * strength;
+      gridB[idx] += (ryb[2] - gridB[idx]) * strength;
+    }
+  }
+  return ryb2rgb(sampleGrid(gridR, cx, cy), sampleGrid(gridY, cx, cy), sampleGrid(gridB, cx, cy));
+}
+
+/* bilinear read so a moving dab's color doesn't band at grid-cell boundaries */
+function sampleGrid(arr, cx, cy) {
+  const gx0 = Math.max(0, Math.min(gridW - 1, Math.floor(cx)));
+  const gy0 = Math.max(0, Math.min(gridH - 1, Math.floor(cy)));
+  const gx1 = Math.min(gridW - 1, gx0 + 1);
+  const gy1 = Math.min(gridH - 1, gy0 + 1);
+  const fx = Math.max(0, Math.min(1, cx - gx0)), fy = Math.max(0, Math.min(1, cy - gy0));
+  const a = arr[gy0 * gridW + gx0], b = arr[gy0 * gridW + gx1];
+  const c = arr[gy1 * gridW + gx0], d = arr[gy1 * gridW + gx1];
+  const top = a + (b - a) * fx, bot = c + (d - c) * fx;
+  return top + (bot - top) * fy;
+}
+
+/* ---------- brush rendering: a handful of jittering bristles, not a flat circle ---------- */
+const NB = 7;
+let bristles = [];
+function newBristles(cx, cy) {
+  const arr = [];
+  for (let i = 0; i < NB; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const d = Math.random() * BRUSH_R * 0.8;
+    arr.push({
+      ox: Math.cos(a) * d, oy: Math.sin(a) * d,
+      alpha: 0.65 + Math.random() * 0.3,
+      width: 1.6 + Math.random() * 1.4,
+      tint: 0.72 + Math.random() * 0.42,
+      lx: cx + Math.cos(a) * d, ly: cy + Math.sin(a) * d
+    });
+  }
+  return arr;
+}
+
+function renderDab(x, y, rgb) {
+  const css = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+
+  ctx.globalAlpha = 0.62;
+  ctx.fillStyle = css;
+  ctx.beginPath();
+  ctx.arc(x, y, BRUSH_R * 0.85, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.lineCap = 'round';
+  for (const br of bristles) {
+    const nx = x + br.ox + (Math.random() - 0.5) * 1.5;
+    const ny = y + br.oy + (Math.random() - 0.5) * 1.5;
+    const tr = Math.max(0, Math.min(255, Math.round(rgb[0] * br.tint)));
+    const tg = Math.max(0, Math.min(255, Math.round(rgb[1] * br.tint)));
+    const tb = Math.max(0, Math.min(255, Math.round(rgb[2] * br.tint)));
+    ctx.strokeStyle = `rgb(${tr},${tg},${tb})`;
+    ctx.globalAlpha = br.alpha;
+    ctx.lineWidth = br.width;
+    ctx.beginPath();
+    ctx.moveTo(br.lx, br.ly);
+    ctx.lineTo(nx, ny);
+    ctx.stroke();
+    br.lx = nx; br.ly = ny;
+  }
+  ctx.globalAlpha = 1;
+}
+
+function depositAndRender(x, y) {
+  renderDab(x, y, depositAt(x, y, currentRYB));
+}
+
+let lastPt = null;
+function strokeTo(x, y) {
+  if (!lastPt) { lastPt = { x, y }; depositAndRender(x, y); return; }
+  const dx = x - lastPt.x, dy = y - lastPt.y;
+  const dist = Math.hypot(dx, dy);
+  const step = Math.max(2, BRUSH_R / 3);
+  const n = Math.max(1, Math.floor(dist / step));
+  for (let i = 1; i <= n; i++) {
+    depositAndRender(lastPt.x + dx * (i / n), lastPt.y + dy * (i / n));
+  }
+  lastPt = { x, y };
+}
+
+/* ---------- persistence: keep today's painting across reloads ---------- */
+const SAVE_KEY = 'posterPaintSnapshot';
+function saveSnapshot() {
+  try { localStorage.setItem(SAVE_KEY, canvas.toDataURL('image/png')); } catch (err) { /* storage full, no problem */ }
+}
+function loadSaved() {
+  try {
+    const data = localStorage.getItem(SAVE_KEY);
+    if (!data) return;
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, W, H);
+    img.src = data;
+  } catch (err) { /* no saved painting, no problem */ }
+}
+
+/* ---------- canvas sizing (keeps the painting when the iPad rotates) ---------- */
+let initialized = false;
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = wrap.getBoundingClientRect();
+  const newW = Math.max(1, Math.round(rect.width)), newH = Math.max(1, Math.round(rect.height));
+  if (initialized && newW === W && newH === H) return; // duplicate fire (resize + orientationchange + visualViewport)
+
+  let prevURL = null;
+  if (initialized) {
+    try { prevURL = canvas.toDataURL('image/png'); } catch (err) { /* no snapshot, no problem */ }
+  }
+
+  W = newW; H = newH;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  initGrid();
+
+  if (prevURL) {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, W, H);
+    img.src = prevURL;
+  } else if (!initialized) {
+    loadSaved();
+  }
+  initialized = true;
+}
+resize();
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', resize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+/* ---------- input ---------- */
+let drawing = false;
+canvas.addEventListener('pointerdown', e => {
+  drawing = true;
+  canvas.setPointerCapture(e.pointerId);
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  lastPt = null;
+  bristles = newBristles(x, y);
+  strokeTo(x, y);
+  e.preventDefault();
+});
+canvas.addEventListener('pointermove', e => {
+  if (!drawing) return;
+  const rect = canvas.getBoundingClientRect();
+  const events = (e.getCoalescedEvents && e.getCoalescedEvents()) || [e];
+  for (const pe of (events.length ? events : [e])) {
+    strokeTo(pe.clientX - rect.left, pe.clientY - rect.top);
+  }
+  e.preventDefault();
+});
+function endStroke() {
+  if (!drawing) return;
+  drawing = false;
+  lastPt = null;
+  saveSnapshot();
+}
+canvas.addEventListener('pointerup', endStroke);
+canvas.addEventListener('pointercancel', endStroke);
+
+document.getElementById('clearBtn').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  initGrid();
+  saveSnapshot();
+});
+</script>
+</body>
+</html>

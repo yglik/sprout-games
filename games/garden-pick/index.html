@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Garden Pick!</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #7fd8f7;
+    touch-action: none;
+  }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+let W = 0, H = 0, grassTop = 0;
+const SPEAKER = { x: 50, y: 50, r: 28 };
+function updateSpeakerPos() { SPEAKER.x = 50; SPEAKER.y = H - 50; }
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  grassTop = H * 0.42;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  updateSpeakerPos();
+}
+resize();
+window.addEventListener('resize', () => { resize(); layoutGarden(); });
+
+const BW = 46;              // basket half-width
+const BH = 34;              // basket half-height
+const SPEED = 170;          // pixels per second — gentle for little hands
+const PICK_RANGE = 105;     // how close the basket must be
+
+const basket = { x: 0, y: 0, tilt: 0 };
+let plants = [];
+let collected = [];         // every picked item, in order: { cropIdx, born }
+let pile = [];              // the few riding inside the basket
+let pops = [];              // juice splashes
+let busy = false;           // true while a picked item is on its showcase trip
+let showcase = null;        // the item currently center-stage: { cropIdx, phase, x, y, r, ... }
+
+function rand(a, b) { return a + Math.random() * (b - a); }
+
+/* ---------- produce drawing (all centred on 0,0, radius r) ---------- */
+function drawTomato(r, ripe, ripeness) {
+  if (ripe) {
+    ctx.fillStyle = '#e8342c';
+    ctx.strokeStyle = '#b31f1a';
+  } else {
+    const k = ripeness;
+    ctx.fillStyle = `rgb(${Math.round(122 + k * 150)},${Math.round(178 - k * 80)},${Math.round(66 - k * 30)})`;
+    ctx.strokeStyle = '#3f8f34';
+  }
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.3, -r * 0.35, r * 0.25, r * 0.18, -0.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#3f8f34';
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.ellipse(Math.cos(a) * r * 0.4, -r * 0.85 + Math.sin(a) * r * 0.15,
+                r * 0.3, r * 0.12, a, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawStrawberry(r, ripe, ripeness) {
+  const k = ripe ? 1 : ripeness;
+  ctx.fillStyle = ripe ? '#f0384a' : `rgb(${Math.round(150 + k * 90)},${Math.round(200 - k * 60)},${Math.round(120 - k * 90)})`;
+  ctx.strokeStyle = ripe ? '#b91c2c' : '#5c8f3f';
+  ctx.lineWidth = r * 0.1;
+  ctx.beginPath();
+  ctx.moveTo(0, r);
+  ctx.bezierCurveTo(-r * 1.05, r * 0.25, -r * 0.9, -r * 0.75, 0, -r * 0.62);
+  ctx.bezierCurveTo(r * 0.9, -r * 0.75, r * 1.05, r * 0.25, 0, r);
+  ctx.fill();
+  ctx.stroke();
+
+  if (ripe) {
+    ctx.fillStyle = '#ffe9a8';
+    for (let i = 0; i < 8; i++) {
+      const a = -1.4 + i * 0.85;
+      const rr = r * (0.2 + (i % 3) * 0.2);
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(a) * rr, Math.sin(a) * rr * 0.9, r * 0.07, r * 0.045, a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.fillStyle = '#4ea83f';
+  for (let i = -2; i <= 2; i++) {
+    ctx.save();
+    ctx.translate(0, -r * 0.6);
+    ctx.rotate(i * 0.45);
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 0.2, r * 0.16, r * 0.36, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.strokeStyle = '#3f8f34';
+  ctx.lineWidth = r * 0.12;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.7);
+  ctx.lineTo(0, -r * 1.1);
+  ctx.stroke();
+}
+
+function drawPepper(r, ripe, ripeness) {
+  const k = ripe ? 1 : ripeness;
+  ctx.fillStyle = ripe ? '#ff9f1c' : `rgb(${Math.round(90 + k * 165)},${Math.round(170 - k * 40)},${Math.round(60 - k * 30)})`;
+  ctx.strokeStyle = ripe ? '#d97706' : '#3f8f34';
+  ctx.lineWidth = r * 0.1;
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.55);
+  ctx.bezierCurveTo(-r * 0.9, -r * 0.5, -r * 0.95, r * 0.5, -r * 0.35, r * 0.95);
+  ctx.bezierCurveTo(-r * 0.15, r * 1.12, r * 0.15, r * 1.12, r * 0.35, r * 0.95);
+  ctx.bezierCurveTo(r * 0.95, r * 0.5, r * 0.9, -r * 0.5, 0, -r * 0.55);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.3, -r * 0.1, r * 0.18, r * 0.4, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#3f8f34';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.18, -r * 0.5);
+  ctx.lineTo(r * 0.18, -r * 0.5);
+  ctx.lineTo(r * 0.1, -r * 0.9);
+  ctx.lineTo(-r * 0.1, -r * 0.9);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawWatermelon(r, ripe, ripeness) {
+  const k = ripe ? 1 : ripeness;
+  ctx.fillStyle = ripe ? '#3a9f3a' : `rgb(${Math.round(150 - k * 40)},${Math.round(200 - k * 10)},${Math.round(120 - k * 40)})`;
+  ctx.strokeStyle = '#256b25';
+  ctx.lineWidth = r * 0.08;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  if (ripe) {
+    ctx.strokeStyle = '#1f5c1f';
+    ctx.lineWidth = r * 0.1;
+    ctx.lineCap = 'round';
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(Math.sin(i * 0.5) * r * 0.9, -r * 0.9);
+      ctx.quadraticCurveTo(Math.sin(i * 0.5) * r * 0.5, 0, Math.sin(i * 0.5) * r * 0.9, r * 0.9);
+      ctx.stroke();
+    }
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.35, -r * 0.35, r * 0.22, r * 0.35, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+const CROPS = [
+  { id: 'tomato',     one: 'tomato',      many: 'tomatoes',      draw: drawTomato,     ripenTime: 22, rMin: 14, rMax: 14, leaf: '#4ea83f' },
+  { id: 'strawberry', one: 'strawberry',  many: 'strawberries',  draw: drawStrawberry, ripenTime: 30, rMin: 9,  rMax: 15, leaf: '#4ea83f' },
+  { id: 'pepper',     one: 'sweet pepper',many: 'sweet peppers', draw: drawPepper,     ripenTime: 36, rMin: 10, rMax: 17, leaf: '#3f8f34' },
+  { id: 'watermelon', one: 'watermelon',  many: 'watermelons',   draw: drawWatermelon, ripenTime: 55, rMin: 11, rMax: 30, leaf: '#3f8f34' }
+];
+
+function produceRadius(item) {
+  const crop = CROPS[item.cropIdx];
+  const k = item.ripe ? 1 : item.ripeness;
+  return crop.rMin + (crop.rMax - crop.rMin) * k;
+}
+
+function newProduce(cropIdx) {
+  return {
+    cropIdx,
+    ox: rand(-30, 30),
+    oy: rand(-38, 8),
+    ripe: Math.random() < 0.35,
+    ripeness: 0,
+    picked: false,
+    wobble: 0,
+    seed: Math.random() * 10
+  };
+}
+
+function layoutGarden() {
+  basket.x = W / 2;
+  basket.y = (grassTop + H) / 2;
+
+  plants = [];
+  const cols = Math.max(3, Math.min(6, Math.floor(W / 220)));
+  const rows = 2;
+  let cropCycle = Math.floor(Math.random() * CROPS.length);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = (W / (cols + 1)) * (c + 1) + rand(-15, 15);
+      const y = grassTop + (H - grassTop) * (0.3 + r * 0.42) + rand(-12, 12);
+      const cropIdx = cropCycle % CROPS.length;
+      cropCycle++;
+      const produce = [];
+      for (let i = 0; i < 3; i++) produce.push(newProduce(cropIdx));
+      plants.push({ x, y, produce });
+    }
+  }
+}
+layoutGarden();
+
+/* ---------- input ---------- */
+const keys = {};
+const ARROWS = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+
+window.addEventListener('keydown', e => {
+  if (ARROWS[e.key]) { keys[ARROWS[e.key]] = true; e.preventDefault(); }
+  if (e.code === 'Space') { keys.space = true; e.preventDefault(); if (!e.repeat) pick(); }
+});
+window.addEventListener('keyup', e => {
+  if (ARROWS[e.key]) { keys[ARROWS[e.key]] = false; e.preventDefault(); }
+  if (e.code === 'Space') { keys.space = false; e.preventDefault(); }
+});
+
+/* ---------- sound ---------- */
+let audio = null;
+function beep(freq, dur, type) {
+  try {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, audio.currentTime);
+    gain.gain.setValueAtTime(0.18, audio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + dur);
+    osc.connect(gain).connect(audio.destination);
+    osc.start();
+    osc.stop(audio.currentTime + dur);
+  } catch (err) { /* no sound, no problem */ }
+}
+
+/* ---------- spoken instructions ---------- */
+const instructionsAudio = new Audio('instructions.m4a');
+function playInstructions() {
+  try {
+    instructionsAudio.currentTime = 0;
+    instructionsAudio.play().catch(speakInstructionsFallback);
+  } catch (err) {
+    speakInstructionsFallback();
+  }
+}
+function speakInstructionsFallback() {
+  try {
+    if (!('speechSynthesis' in window)) return;
+    const msg = new SpeechSynthesisUtterance(
+      'Use the arrow keys to move your basket around the garden. ' +
+      'Press space to pick the ripe fruits and vegetables. ' +
+      'Some of them take longer to grow, and get bigger the more ripe they are!'
+    );
+    msg.rate = 0.95;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(msg);
+  } catch (err) { /* no speech, no problem */ }
+}
+
+/* ---------- each crop's own sound, played while it's shown center-stage ---------- */
+const cropAudioCache = {};
+function playCropSound(cropIdx, onDone) {
+  const id = CROPS[cropIdx].id;
+  let a = cropAudioCache[id];
+  if (!a) { a = new Audio(id + '.m4a'); cropAudioCache[id] = a; }
+  let done = false;
+  const finish = () => { if (done) return; done = true; onDone(); };
+  const safety = setTimeout(finish, 3000);
+  a.onended = () => { clearTimeout(safety); finish(); };
+  try {
+    a.currentTime = 0;
+    a.play().catch(() => { clearTimeout(safety); setTimeout(finish, 800); });
+  } catch (err) {
+    clearTimeout(safety);
+    setTimeout(finish, 800);
+  }
+}
+
+/* ---------- picking ---------- */
+function nearestProduce(onlyRipe) {
+  let best = null, bestD = PICK_RANGE;
+  for (const p of plants) {
+    for (const item of p.produce) {
+      if (item.picked) continue;
+      if (onlyRipe && !item.ripe) continue;
+      const d = Math.hypot(p.x + item.ox - basket.x, p.y + item.oy - basket.y);
+      if (d < bestD) { bestD = d; best = { plant: p, item }; }
+    }
+  }
+  return best;
+}
+
+function pick() {
+  if (busy) return;
+  const hit = nearestProduce(true);
+  if (hit) {
+    const item = hit.item;
+    item.picked = true;
+    busy = true;
+    const r0 = produceRadius(item);
+    const x = hit.plant.x + item.ox, y = hit.plant.y + item.oy;
+    showcase = {
+      cropIdx: item.cropIdx,
+      phase: 'toCenter',
+      k: 0,
+      x0: x, y0: y, x, y,
+      r0, r: r0,
+      bigR: Math.max(70, Math.min(W, H) * 0.22)
+    };
+    for (let i = 0; i < 8; i++) {
+      pops.push({ x, y, life: 1, vx: rand(-90, 90), vy: rand(-160, -40), r: rand(3, 6) });
+    }
+    beep(660, 0.12);
+    return;
+  }
+  const green = nearestProduce(false);
+  if (green) {
+    green.item.wobble = 1;
+    beep(240, 0.15, 'triangle');
+  }
+}
+
+/* ---------- showcase: enlarge picked item at screen center, say its name, then deliver it ---------- */
+function updateShowcase(dt, now) {
+  if (!showcase) return;
+  const s = showcase;
+
+  if (s.phase === 'toCenter') {
+    s.k = Math.min(1, s.k + dt / 0.45);
+    const e = 1 - Math.pow(1 - s.k, 3);
+    s.x = s.x0 + (W / 2 - s.x0) * e;
+    s.y = s.y0 + (H / 2 - s.y0) * e;
+    s.r = s.r0 + (s.bigR - s.r0) * e;
+    if (s.k >= 1) {
+      s.phase = 'hold';
+      s.x = W / 2; s.y = H / 2; s.r = s.bigR;
+      playCropSound(s.cropIdx, () => {
+        if (showcase === s) { s.phase = 'toBasket'; s.k = 0; s.fromX = s.x; s.fromY = s.y; }
+      });
+    }
+  } else if (s.phase === 'toBasket') {
+    s.k = Math.min(1, s.k + dt / 0.5);
+    const e = 1 - Math.pow(1 - s.k, 3);
+    const tx = basket.x, ty = basket.y - BH + 6;
+    s.x = s.fromX + (tx - s.fromX) * e;
+    s.y = s.fromY + (ty - s.fromY) * e - Math.sin(e * Math.PI) * 70;
+    s.r = s.bigR + (s.r0 - s.bigR) * e;
+    if (s.k >= 1) {
+      collected.push({ cropIdx: s.cropIdx, born: now });
+      pile.push({ px: rand(-BW * 0.55, BW * 0.55), py: rand(-6, 4), cropIdx: s.cropIdx });
+      if (pile.length > 7) pile.shift();
+      beep(990, 0.14);
+      showcase = null;
+      busy = false;
+    }
+  }
+  // phase 'hold': waiting on playCropSound's callback, nothing to advance here
+}
+
+function drawShowcase(now) {
+  if (!showcase) return;
+  const s = showcase;
+
+  if (s.phase === 'hold' || (s.phase === 'toCenter' && s.k > 0.6)) {
+    const dim = s.phase === 'hold' ? 0.35 : ((s.k - 0.6) / 0.4) * 0.35;
+    ctx.fillStyle = 'rgba(0,0,0,' + dim + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  const bob = s.phase === 'hold' ? Math.sin(now / 180) * 6 : 0;
+  ctx.save();
+  ctx.translate(s.x, s.y + bob);
+  CROPS[s.cropIdx].draw(s.r, true, 1);
+  ctx.restore();
+}
+
+/* ---------- drawing ---------- */
+function drawBackground() {
+  const sky = ctx.createLinearGradient(0, 0, 0, grassTop);
+  sky.addColorStop(0, '#8fe3ff');
+  sky.addColorStop(1, '#d8f6ff');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, grassTop + 2);
+
+  ctx.fillStyle = '#ffd93d';
+  ctx.beginPath();
+  ctx.arc(W - 90, 80, 46, 0, Math.PI * 2);
+  ctx.fill();
+
+  const grass = ctx.createLinearGradient(0, grassTop, 0, H);
+  grass.addColorStop(0, '#8ee063');
+  grass.addColorStop(1, '#5cb83e');
+  ctx.fillStyle = grass;
+  ctx.beginPath();
+  ctx.moveTo(0, grassTop);
+  ctx.quadraticCurveTo(W / 2, grassTop - 26, W, grassTop);
+  ctx.lineTo(W, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawPlant(p, t) {
+  const crop = CROPS[p.produce[0].cropIdx];
+  ctx.strokeStyle = '#3f8f34';
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y + 34);
+  ctx.lineTo(p.x, p.y - 30);
+  ctx.stroke();
+
+  ctx.fillStyle = crop.leaf;
+  for (const s of [-1, 1]) {
+    ctx.save();
+    ctx.translate(p.x, p.y - 4);
+    ctx.rotate(s * 0.5 + Math.sin(t / 900 + p.x) * 0.05);
+    ctx.beginPath();
+    ctx.ellipse(s * 26, 0, 26, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  for (const item of p.produce) {
+    if (item.picked) continue;
+    const x = p.x + item.ox;
+    const y = p.y + item.oy + Math.sin(t / 900 + item.seed) * 2;
+    const shake = item.wobble > 0 ? Math.sin(t / 25) * 6 * item.wobble : 0;
+    const r = produceRadius(item);
+
+    ctx.save();
+    ctx.translate(x + shake, y);
+    crop.draw(r, item.ripe, item.ripeness);
+    ctx.restore();
+
+    if (item.ripe && Math.hypot(x - basket.x, y - basket.y) < PICK_RANGE) {
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.5 + Math.sin(t / 220) * 0.3) + ')';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(x, y, r + 14 + Math.sin(t / 220) * 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawBasket(t) {
+  const x = basket.x, y = basket.y;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(basket.tilt);
+
+  // shadow
+  ctx.globalAlpha = 0.15;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(0, BH + 8, BW * 0.85, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // handle (behind)
+  ctx.strokeStyle = '#a9752f';
+  ctx.lineWidth = 9;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(0, -BH + 6, BW * 0.62, Math.PI * 1.08, Math.PI * 1.92);
+  ctx.stroke();
+
+  // inside (dark) so produce looks like it sits in it
+  ctx.fillStyle = '#7a5220';
+  ctx.beginPath();
+  ctx.ellipse(0, -BH + 6, BW * 0.9, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // produce riding inside
+  pile.forEach((s) => {
+    ctx.save();
+    ctx.translate(s.px, -BH + 6 + s.py);
+    CROPS[s.cropIdx].draw(10, true, 1);
+    ctx.restore();
+  });
+
+  // body (front wall)
+  const body = ctx.createLinearGradient(0, -BH, 0, BH);
+  body.addColorStop(0, '#d59a4c');
+  body.addColorStop(1, '#a9752f');
+  ctx.fillStyle = body;
+  ctx.strokeStyle = '#8a5d22';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-BW, -BH + 6);
+  ctx.lineTo(BW, -BH + 6);
+  ctx.lineTo(BW * 0.72, BH);
+  ctx.quadraticCurveTo(0, BH + 10, -BW * 0.72, BH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // weave
+  ctx.strokeStyle = 'rgba(122,82,32,0.55)';
+  ctx.lineWidth = 3;
+  for (let i = 1; i <= 3; i++) {
+    const yy = -BH + 6 + (i * (BH * 2 - 6)) / 4;
+    const half = BW - (i * (BW * 0.28)) / 3;
+    ctx.beginPath();
+    ctx.moveTo(-half, yy);
+    ctx.quadraticCurveTo(0, yy + 5, half, yy);
+    ctx.stroke();
+  }
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * BW * 0.38, -BH + 8);
+    ctx.lineTo(i * BW * 0.28, BH - 2);
+    ctx.stroke();
+  }
+
+  // rim
+  ctx.fillStyle = '#c9873c';
+  ctx.strokeStyle = '#8a5d22';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(0, -BH + 6, BW, 12, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/* ---------- tray: every picked item, grouped by type, with a count ---------- */
+function drawTray(t) {
+  const counts = new Array(CROPS.length).fill(0);
+  for (const item of collected) counts[item.cropIdx]++;
+
+  const activeCrops = CROPS.map((c, i) => i).filter(i => counts[i] > 0);
+  if (activeCrops.length === 0) return;
+
+  const pad = 14, iconStep = 30, iconSize = 11, rowH = 34, maxIconsPerRow = 6;
+  const x = 24, y = 20;
+
+  let maxRowWidth = 0;
+  const rows = activeCrops.map(idx => {
+    const n = counts[idx];
+    const iconsShown = Math.min(n, maxIconsPerRow);
+    maxRowWidth = Math.max(maxRowWidth, iconsShown * iconStep + 60);
+    return { idx, n, iconsShown };
+  });
+
+  const w = pad * 2 + maxRowWidth;
+  const h = pad * 2 + rows.length * rowH;
+
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 20);
+  ctx.fill();
+  ctx.stroke();
+
+  rows.forEach((row, ri) => {
+    const crop = CROPS[row.idx];
+    const cy = y + pad + rowH / 2 + ri * rowH;
+    let cx = x + pad + iconSize;
+    for (let i = 0; i < row.iconsShown; i++) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      const age = i === row.iconsShown - 1 ? (t - collected[collected.length - 1].born) / 260 : 1;
+      const s = age < 1 ? 0.4 + 0.6 * (1 - Math.pow(1 - age, 3)) + Math.sin(age * Math.PI) * 0.25 : 1;
+      ctx.scale(s, s);
+      crop.draw(iconSize, true, 1);
+      ctx.restore();
+      cx += iconStep;
+    }
+    ctx.fillStyle = '#33242e';
+    ctx.font = 'bold 18px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('×' + row.n, cx + 2, cy);
+  });
+}
+
+/* ---------- visual keyboard: shows the keys, lights up on real presses ---------- */
+const KB = { cx: 0, cy: 60 };
+function updateKeyboardPos() { KB.cx = W - 240; }
+
+function keyRect(cx, cy, w, h, active, label) {
+  ctx.fillStyle = active ? '#ffd93d' : 'rgba(255,255,255,0.85)';
+  ctx.strokeStyle = active ? '#d9a406' : '#8a5d22';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.roundRect(cx - w / 2, cy - h / 2, w, h, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#33242e';
+  ctx.font = 'bold ' + Math.round(h * 0.5) + 'px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, cx, cy + 1);
+}
+
+function drawKeyboard() {
+  const kw = 34, kh = 34, gap = 4;
+  const cx = KB.cx, cy = KB.cy;
+
+  keyRect(cx, cy, kw, kh, keys.up, '↑');
+
+  const rowY = cy + kh + gap;
+  keyRect(cx - kw - gap, rowY, kw, kh, keys.left, '←');
+  keyRect(cx, rowY, kw, kh, keys.down, '↓');
+  keyRect(cx + kw + gap, rowY, kw, kh, keys.right, '→');
+
+  const spaceY = rowY + kh + gap;
+  const spaceW = kw * 3 + gap * 2;
+  keyRect(cx, spaceY, spaceW, kh * 0.8, keys.space, 'SPACE');
+}
+
+/* ---------- speaker button: reads the instructions out loud ---------- */
+function drawSpeakerButton() {
+  ctx.save();
+  ctx.translate(SPEAKER.x, SPEAKER.y);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.strokeStyle = '#8a5d22';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, SPEAKER.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.font = Math.round(SPEAKER.r * 1.15) + 'px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🔊', 0, 2);
+  ctx.restore();
+}
+
+canvas.addEventListener('pointerdown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  if (Math.hypot(px - SPEAKER.x, py - SPEAKER.y) <= SPEAKER.r) { playInstructions(); return; }
+});
+
+function drawHint() {
+  ctx.fillStyle = 'rgba(51,36,46,0.55)';
+  ctx.font = 'bold 22px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('Arrows to move  •  SPACE to pick the ripe ones', W / 2, H - 24);
+}
+
+/* ---------- loop ---------- */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+  let dx = 0, dy = 0;
+  if (keys.left) dx -= 1;
+  if (keys.right) dx += 1;
+  if (keys.up) dy -= 1;
+  if (keys.down) dy += 1;
+  if (dx || dy) {
+    const len = Math.hypot(dx, dy);
+    basket.x += (dx / len) * SPEED * dt;
+    basket.y += (dy / len) * SPEED * dt;
+  }
+  // basket leans into the turn
+  basket.tilt += ((dx ? dx * 0.12 : 0) - basket.tilt) * Math.min(1, dt * 6);
+
+  basket.x = Math.max(BW, Math.min(W - BW, basket.x));
+  basket.y = Math.max(grassTop + BH * 0.6, Math.min(H - BH - 10, basket.y));
+
+  updateKeyboardPos();
+
+  for (const p of plants) {
+    for (const item of p.produce) {
+      const crop = CROPS[item.cropIdx];
+      if (item.wobble > 0) item.wobble = Math.max(0, item.wobble - dt * 3);
+      if (item.picked) {
+        item.ripeness -= dt / 6;
+        if (item.ripeness <= -1) Object.assign(item, newProduce(item.cropIdx), { ripe: false, ripeness: 0 });
+      } else if (!item.ripe) {
+        item.ripeness += dt / crop.ripenTime;
+        if (item.ripeness >= 1) { item.ripe = true; item.ripeness = 1; }
+      }
+    }
+  }
+
+  updateShowcase(dt, now);
+
+  for (let i = pops.length - 1; i >= 0; i--) {
+    const s = pops[i];
+    s.life -= dt * 1.4;
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    s.vy += 420 * dt;
+    if (s.life <= 0) pops.splice(i, 1);
+  }
+
+  drawBackground();
+
+  const sorted = plants.slice().sort((a, b) => a.y - b.y);
+  let drawnBasket = false;
+  for (const p of sorted) {
+    if (!drawnBasket && p.y > basket.y) { drawBasket(now); drawnBasket = true; }
+    drawPlant(p, now);
+  }
+  if (!drawnBasket) drawBasket(now);
+
+  ctx.fillStyle = '#e8342c';
+  for (const s of pops) {
+    ctx.globalAlpha = Math.max(0, s.life);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  drawShowcase(now);
+
+  drawTray(now);
+  drawKeyboard();
+  drawSpeakerButton();
+  drawHint();
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

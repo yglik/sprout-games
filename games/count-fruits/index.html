@@ -2,17 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Count the Fruit!</title>
 <style>
   html, body {
     margin: 0;
     height: 100%;
     overflow: hidden;
+    overscroll-behavior: none;
     background: #ffe9c7;
     touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
-  canvas { display: block; }
+  canvas { display: block; touch-action: none; -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
 <body>
@@ -33,7 +39,11 @@ function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 resize();
-window.addEventListener('resize', () => { resize(); layoutFruit(); });
+function handleResize() { resize(); layoutFruit(); }
+window.addEventListener('resize', handleResize);
+window.addEventListener('orientationchange', handleResize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', handleResize);
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
 function rand(a, b) { return a + Math.random() * (b - a); }
 
@@ -317,9 +327,10 @@ canvas.addEventListener('pointerdown', e => {
   const g = padGeom();
   const rect = canvas.getBoundingClientRect();
   const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  const pad = 8;
   for (let d = 0; d <= 9; d++) {
     const x = g.x0 + d * g.step;
-    if (px >= x && px <= x + g.size && py >= g.y && py <= g.y + g.size) { answer(d); return; }
+    if (px >= x - pad && px <= x + g.size + pad && py >= g.y - pad && py <= g.y + g.size + pad) { answer(d); return; }
   }
   if (!audio) tone(880, 0.001);   // unlock audio on first tap
 });

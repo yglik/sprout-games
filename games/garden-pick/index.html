@@ -2,17 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Garden Pick!</title>
 <style>
   html, body {
     margin: 0;
     height: 100%;
     overflow: hidden;
+    overscroll-behavior: none;
     background: #7fd8f7;
     touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
-  canvas { display: block; }
+  canvas { display: block; touch-action: none; -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
 <body>
@@ -38,7 +44,11 @@ function resize() {
   updateSpeakerPos();
 }
 resize();
-window.addEventListener('resize', () => { resize(); layoutGarden(); });
+function handleResize() { resize(); layoutGarden(); }
+window.addEventListener('resize', handleResize);
+window.addEventListener('orientationchange', handleResize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', handleResize);
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
 const BW = 46;              // basket half-width
 const BH = 34;              // basket half-height
@@ -246,6 +256,8 @@ window.addEventListener('keyup', e => {
   if (e.code === 'Space') { keys.space = false; e.preventDefault(); }
 });
 
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+
 /* ---------- sound ---------- */
 let audio = null;
 function beep(freq, dur, type) {
@@ -290,10 +302,10 @@ function speakInstructionsFallback() {
 
 /* ---------- each crop's own sound, played while it's shown center-stage ---------- */
 const cropAudioCache = {};
+CROPS.forEach(c => { cropAudioCache[c.id] = new Audio(c.id + '.m4a'); });
 function playCropSound(cropIdx, onDone) {
   const id = CROPS[cropIdx].id;
-  let a = cropAudioCache[id];
-  if (!a) { a = new Audio(id + '.m4a'); cropAudioCache[id] = a; }
+  const a = cropAudioCache[id];
   let done = false;
   const finish = () => { if (done) return; done = true; onDone(); };
   const safety = setTimeout(finish, 3000);
@@ -306,6 +318,25 @@ function playCropSound(cropIdx, onDone) {
     setTimeout(finish, 800);
   }
 }
+
+/* ---------- unlock audio playback for iOS Safari (must happen inside a real user gesture) ---------- */
+let audioUnlocked = false;
+function unlockAudio() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  try {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+  } catch (err) { /* no audio context, no problem */ }
+  [instructionsAudio, ...Object.values(cropAudioCache)].forEach(a => {
+    try {
+      a.volume = 0;
+      a.play().then(() => { a.pause(); a.currentTime = 0; a.volume = 1; })
+              .catch(() => { a.volume = 1; });
+    } catch (err) { /* no audio, no problem */ }
+  });
+}
+window.addEventListener('pointerdown', unlockAudio, { once: true });
 
 /* ---------- picking ---------- */
 function nearestProduce(onlyRipe) {
@@ -321,7 +352,7 @@ function nearestProduce(onlyRipe) {
   return best;
 }
 
-function pick() {
+function pick(auto) {
   if (busy) return;
   const hit = nearestProduce(true);
   if (hit) {
@@ -344,6 +375,7 @@ function pick() {
     beep(660, 0.12);
     return;
   }
+  if (auto) return;
   const green = nearestProduce(false);
   if (green) {
     green.item.wobble = 1;
@@ -660,18 +692,42 @@ function drawSpeakerButton() {
   ctx.restore();
 }
 
+/* ---------- touch / mouse drag: move the basket by dragging anywhere in the garden ---------- */
+const DRAG_OFFSET_Y = 70;   // basket sits above the finger, not hidden under it
+let dragging = false;
+let dragPointerId = null;
+
+function moveBasketTo(e) {
+  const rect = canvas.getBoundingClientRect();
+  basket.x = e.clientX - rect.left;
+  basket.y = e.clientY - rect.top - DRAG_OFFSET_Y;
+}
+
 canvas.addEventListener('pointerdown', e => {
   const rect = canvas.getBoundingClientRect();
   const px = e.clientX - rect.left, py = e.clientY - rect.top;
   if (Math.hypot(px - SPEAKER.x, py - SPEAKER.y) <= SPEAKER.r) { playInstructions(); return; }
+  dragging = true;
+  dragPointerId = e.pointerId;
+  canvas.setPointerCapture(e.pointerId);
+  moveBasketTo(e);
 });
+canvas.addEventListener('pointermove', e => {
+  if (dragging && e.pointerId === dragPointerId) moveBasketTo(e);
+});
+function endDrag(e) {
+  if (e.pointerId === dragPointerId) { dragging = false; dragPointerId = null; }
+}
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
 
 function drawHint() {
   ctx.fillStyle = 'rgba(51,36,46,0.55)';
   ctx.font = 'bold 22px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('Arrows to move  •  SPACE to pick the ripe ones', W / 2, H - 24);
+  const msg = isTouch ? 'Drag your basket to pick the ripe ones!' : 'Arrows to move  •  SPACE to pick the ripe ones';
+  ctx.fillText(msg, W / 2, H - 24);
 }
 
 /* ---------- loop ---------- */
@@ -695,6 +751,8 @@ function loop(now) {
 
   basket.x = Math.max(BW, Math.min(W - BW, basket.x));
   basket.y = Math.max(grassTop + BH * 0.6, Math.min(H - BH - 10, basket.y));
+
+  if (dragging && !busy) pick(true);
 
   updateKeyboardPos();
 
@@ -745,7 +803,7 @@ function loop(now) {
   drawShowcase(now);
 
   drawTray(now);
-  drawKeyboard();
+  if (!isTouch) drawKeyboard();
   drawSpeakerButton();
   drawHint();
 

@@ -195,11 +195,53 @@ function drawWatermelon(r, ripe, ripeness) {
   ctx.fill();
 }
 
+/* ---------- photos: img/<id>.png, with a green-tinted copy for unripe produce.
+   Falls back to the vector drawing above until (or if) the photo loads. ---------- */
+const PHOTOS = {};
+function loadPhoto(id) {
+  const img = new Image();
+  img.onload = () => {
+    const photo = { img, unripe: null, aspect: img.width / img.height };
+    try {
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height), px = d.data;
+      for (let i = 0; i < px.length; i += 4) {
+        const l = 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2];
+        px[i] = 40 + l * 0.45; px[i + 1] = 90 + l * 0.6; px[i + 2] = 20 + l * 0.2;
+      }
+      g.putImageData(d, 0, 0);
+      photo.unripe = c;
+    } catch (e) { /* tainted canvas (file://) — unripe items keep the vector look */ }
+    PHOTOS[id] = photo;
+  };
+  img.src = 'img/' + id + '.png';
+}
+
+function withPhoto(id, vector) {
+  loadPhoto(id);
+  return function (r, ripe, ripeness) {
+    const photo = PHOTOS[id];
+    if (!photo || (!ripe && !photo.unripe)) return vector(r, ripe, ripeness);
+    const size = r * 2.3;
+    const w = photo.aspect >= 1 ? size : size * photo.aspect;
+    const h = photo.aspect >= 1 ? size / photo.aspect : size;
+    if (ripe) { ctx.drawImage(photo.img, -w / 2, -h / 2, w, h); return; }
+    ctx.drawImage(photo.unripe, -w / 2, -h / 2, w, h);
+    const a = ctx.globalAlpha;
+    ctx.globalAlpha = a * ripeness;
+    ctx.drawImage(photo.img, -w / 2, -h / 2, w, h);
+    ctx.globalAlpha = a;
+  };
+}
+
 const CROPS = [
-  { id: 'tomato',     one: 'tomato',      many: 'tomatoes',      draw: drawTomato,     ripenTime: 22, rMin: 14, rMax: 14, leaf: '#4ea83f' },
-  { id: 'strawberry', one: 'strawberry',  many: 'strawberries',  draw: drawStrawberry, ripenTime: 30, rMin: 9,  rMax: 15, leaf: '#4ea83f' },
-  { id: 'pepper',     one: 'sweet pepper',many: 'sweet peppers', draw: drawPepper,     ripenTime: 36, rMin: 10, rMax: 17, leaf: '#3f8f34' },
-  { id: 'watermelon', one: 'watermelon',  many: 'watermelons',   draw: drawWatermelon, ripenTime: 55, rMin: 11, rMax: 30, leaf: '#3f8f34' }
+  { id: 'tomato',     one: 'tomato',      many: 'tomatoes',      draw: withPhoto('tomato', drawTomato),     ripenTime: 22, rMin: 14, rMax: 14, leaf: '#4ea83f' },
+  { id: 'strawberry', one: 'strawberry',  many: 'strawberries',  draw: withPhoto('strawberry', drawStrawberry), ripenTime: 30, rMin: 9,  rMax: 15, leaf: '#4ea83f' },
+  { id: 'pepper',     one: 'sweet pepper',many: 'sweet peppers', draw: withPhoto('pepper', drawPepper),     ripenTime: 36, rMin: 10, rMax: 17, leaf: '#3f8f34' },
+  { id: 'watermelon', one: 'watermelon',  many: 'watermelons',   draw: withPhoto('watermelon', drawWatermelon), ripenTime: 55, rMin: 11, rMax: 30, leaf: '#3f8f34' }
 ];
 
 function produceRadius(item) {

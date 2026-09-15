@@ -7,7 +7,8 @@ or serve as a static file.
 ## Games
 
 - **[Garden Pick!](games/garden-pick/index.html)** — walk around a garden, pick ripe fruit
-  and veggies into a basket, hear each one named out loud.
+  and veggies into a basket, hear each one named out loud. Produce is drawn from real photos
+  (credits in `games/garden-pick/img/CREDITS.md`).
 - **[Count the Fruit!](games/count-fruits/index.html)** — count the fruit shown on screen
   and tap the matching number on an on-screen keypad.
 - **[Poster Paint!](games/poster-paint/index.html)** — paint with a single bristle brush
@@ -55,7 +56,7 @@ then visit `http://localhost:8080`.
 ```
 index.html              landing page, links to each game
 games/
-  garden-pick/           Garden Pick! (index.html + spoken-word audio clips)
+  garden-pick/           Garden Pick! (index.html + spoken-word audio clips + img/ photos)
   count-fruits/           Count the Fruit!
   poster-paint/           Poster Paint!
 ```

@@ -83,3 +83,26 @@ Touch controls:
   should be something left to wait for.
 - **Poster Paint!** — the broom asks a second time before it wipes the paper, and
   the painting survives rotations, app switches and reloads.
+
+## How updates reach an installed app
+
+`sw.js` caches the games so they work offline, which means updates need a moment's thought:
+
+- **Game pages** (all the code lives inside each `index.html`) are fetched
+  network-first, so a deploy shows up the next time the game is opened while online.
+- **Pictures, audio and icons** are served from the cache and refreshed in the
+  background, so a changed asset appears one launch later.
+- **Offline**, whatever was cached last is served.
+- Changing `sw.js` itself installs a new worker immediately (`skipWaiting` +
+  `clients.claim`); bump `CACHE` when you want the old entries thrown away.
+
+This only works if the server tells the browser to revalidate. nginx sends no
+`Cache-Control` of its own, and browsers then guess a freshness window from
+`Last-Modified` and can sit on a stale page for a long time, so the site config
+sets `add_header Cache-Control "no-cache";` — with ETags a revalidation is a
+cheap 304. The same config also serves `.webmanifest` as
+`application/manifest+json`.
+
+Note that an app resumed from the background is not a fresh load: the page that
+is already on screen stays as it is until it navigates (tap ← and go back in) or
+the app is closed from the app switcher.

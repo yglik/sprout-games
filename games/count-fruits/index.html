@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sprout">
+<meta name="theme-color" content="#ffe9c7">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
 <title>Count the Fruit!</title>
 <style>
   html, body {
@@ -19,9 +24,23 @@
     -webkit-touch-callout: none;
   }
   canvas { display: block; touch-action: none; -webkit-tap-highlight-color: transparent; }
+  .back {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    left: calc(env(safe-area-inset-left, 0px) + 10px);
+    z-index: 10;
+    width: 52px; height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; text-decoration: none; color: #33242e;
+    background: rgba(255,255,255,0.85);
+    border-radius: 50%;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.12), 0 6px 14px rgba(0,0,0,0.14);
+  }
+  .back:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.12); }
 </style>
 </head>
 <body>
+<a class="back" href="../../index.html" aria-label="Back to games">←</a>
 <canvas id="game"></canvas>
 <script>
 const canvas = document.getElementById('game');
@@ -530,6 +549,11 @@ function loop(now) {
 
 newRound();
 requestAnimationFrame(loop);
+
+/* keep the whole app offline-ready when it is installed to the home screen */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../../sw.js').catch(() => { /* offline support is a bonus */ });
+}
 </script>
 </body>
 </html>

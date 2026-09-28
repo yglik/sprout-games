@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sprout">
+<meta name="theme-color" content="#7fd8f7">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Sprout Games</title>
 <style>
   * { box-sizing: border-box; }
@@ -62,6 +69,12 @@
     font-size: 14px;
     color: #567a5a;
   }
+  p.tip {
+    margin: 26px 0 0;
+    font-size: 13px;
+    color: #2b5d34;
+    opacity: 0.6;
+  }
 </style>
 </head>
 <body>
@@ -74,6 +87,11 @@
         <h2>Garden Pick!</h2>
         <p>Walk the garden and pick ripe fruit into your basket</p>
       </a>
+      <a class="card" href="games/hebrew-letters/index.html">
+        <span class="emoji">א</span>
+        <h2>אותיות! · Hebrew Letters</h2>
+        <p>Tap a letter, see a picture and hear it said out loud</p>
+      </a>
       <a class="card" href="games/count-fruits/index.html">
         <span class="emoji">🍓</span>
         <h2>Count the Fruit!</h2>
@@ -85,6 +103,12 @@
         <p>Paint with a bristle brush and 9 colors that mix like true paint</p>
       </a>
     </div>
+    <p class="tip">On an iPad: Share → <b>Add to Home Screen</b> to play full screen.</p>
   </div>
+<script>
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => { /* offline support is a bonus */ });
+}
+</script>
 </body>
 </html>

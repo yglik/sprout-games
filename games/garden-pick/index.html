@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sprout">
+<meta name="theme-color" content="#7fd8f7">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
 <title>Garden Pick!</title>
 <style>
   html, body {
@@ -19,9 +24,24 @@
     -webkit-touch-callout: none;
   }
   canvas { display: block; touch-action: none; -webkit-tap-highlight-color: transparent; }
+  body { --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px); }
+  .back {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    left: calc(env(safe-area-inset-left, 0px) + 10px);
+    z-index: 10;
+    width: 52px; height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; text-decoration: none; color: #33242e;
+    background: rgba(255,255,255,0.85);
+    border-radius: 50%;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.12), 0 6px 14px rgba(0,0,0,0.14);
+  }
+  .back:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.12); }
 </style>
 </head>
 <body>
+<a class="back" href="../../index.html" aria-label="Back to games">←</a>
 <canvas id="game"></canvas>
 <script>
 const canvas = document.getElementById('game');
@@ -29,7 +49,26 @@ const ctx = canvas.getContext('2d');
 
 let W = 0, H = 0, grassTop = 0;
 const SPEAKER = { x: 50, y: 50, r: 28 };
-function updateSpeakerPos() { SPEAKER.x = 50; SPEAKER.y = H - 50; }
+let safeTop = 0, safeBottom = 0;
+function readSafeArea() {
+  const cs = getComputedStyle(document.body);
+  safeTop = parseFloat(cs.getPropertyValue('--sat')) || 0;
+  safeBottom = parseFloat(cs.getPropertyValue('--sab')) || 0;
+}
+function updateSpeakerPos() { SPEAKER.x = W / 2; SPEAKER.y = safeTop + 46; }
+
+/* on-screen controls for touch; positioned by updateTouchControlPos() on every resize */
+const JOY = { homeX: 0, homeY: 0, x: 0, y: 0, r: 74, knobR: 32, kx: 0, ky: 0, dx: 0, dy: 0, id: null };
+const PICK_BTN = { x: 0, y: 0, r: 54, id: null, flash: 0 };
+
+function updateTouchControlPos() {
+  JOY.homeX = JOY.r + 26;
+  JOY.homeY = H - safeBottom - JOY.r - 26;
+  if (JOY.id === null) { JOY.x = JOY.homeX; JOY.y = JOY.homeY; }
+  PICK_BTN.x = W - PICK_BTN.r - 26;
+  PICK_BTN.y = H - safeBottom - PICK_BTN.r - 26;
+}
+
 
 function resize() {
   const dpr = window.devicePixelRatio || 1;
@@ -41,7 +80,9 @@ function resize() {
   canvas.style.width = W + 'px';
   canvas.style.height = H + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  readSafeArea();
   updateSpeakerPos();
+  updateTouchControlPos();
 }
 resize();
 function handleResize() { resize(); layoutGarden(); }
@@ -238,10 +279,10 @@ function withPhoto(id, vector) {
 }
 
 const CROPS = [
-  { id: 'tomato',     one: 'tomato',      many: 'tomatoes',      draw: withPhoto('tomato', drawTomato),     ripenTime: 22, rMin: 14, rMax: 14, leaf: '#4ea83f' },
-  { id: 'strawberry', one: 'strawberry',  many: 'strawberries',  draw: withPhoto('strawberry', drawStrawberry), ripenTime: 30, rMin: 9,  rMax: 15, leaf: '#4ea83f' },
-  { id: 'pepper',     one: 'sweet pepper',many: 'sweet peppers', draw: withPhoto('pepper', drawPepper),     ripenTime: 36, rMin: 10, rMax: 17, leaf: '#3f8f34' },
-  { id: 'watermelon', one: 'watermelon',  many: 'watermelons',   draw: withPhoto('watermelon', drawWatermelon), ripenTime: 55, rMin: 11, rMax: 30, leaf: '#3f8f34' }
+  { id: 'tomato',     one: 'tomato',      many: 'tomatoes',      draw: withPhoto('tomato', drawTomato),     ripenTime: 55, rMin: 14, rMax: 14, leaf: '#4ea83f' },
+  { id: 'strawberry', one: 'strawberry',  many: 'strawberries',  draw: withPhoto('strawberry', drawStrawberry), ripenTime: 72, rMin: 9,  rMax: 15, leaf: '#4ea83f' },
+  { id: 'pepper',     one: 'sweet pepper',many: 'sweet peppers', draw: withPhoto('pepper', drawPepper),     ripenTime: 92, rMin: 10, rMax: 17, leaf: '#3f8f34' },
+  { id: 'watermelon', one: 'watermelon',  many: 'watermelons',   draw: withPhoto('watermelon', drawWatermelon), ripenTime: 135, rMin: 11, rMax: 30, leaf: '#3f8f34' }
 ];
 
 function produceRadius(item) {
@@ -255,7 +296,7 @@ function newProduce(cropIdx) {
     cropIdx,
     ox: rand(-30, 30),
     oy: rand(-38, 8),
-    ripe: Math.random() < 0.35,
+    ripe: Math.random() < 0.18,
     ripeness: 0,
     picked: false,
     wobble: 0,
@@ -638,7 +679,7 @@ function drawTray(t) {
   if (activeCrops.length === 0) return;
 
   const pad = 14, iconStep = 30, iconSize = 11, rowH = 34, maxIconsPerRow = 6;
-  const x = 24, y = 20;
+  const x = 24, y = safeTop + 78;
 
   let maxRowWidth = 0;
   const rows = activeCrops.map(idx => {
@@ -734,8 +775,23 @@ function drawSpeakerButton() {
   ctx.restore();
 }
 
-/* ---------- touch / mouse drag: move the basket by dragging anywhere in the garden ---------- */
-const DRAG_OFFSET_Y = 70;   // basket sits above the finger, not hidden under it
+/* ---------- controls: a thumb joystick and a pick button on touch, mouse drag on a desktop ---------- */
+// knob offset for drawing, plus a dead zone so a resting thumb does not creep
+function setJoystick(px, py) {
+  const dx = px - JOY.x, dy = py - JOY.y;
+  const len = Math.hypot(dx, dy);
+  const k = len > JOY.r ? JOY.r / len : 1;
+  JOY.kx = dx * k;
+  JOY.ky = dy * k;
+  const nx = JOY.kx / JOY.r, ny = JOY.ky / JOY.r;
+  const mag = Math.hypot(nx, ny), dead = 0.16;
+  if (mag < dead) { JOY.dx = 0; JOY.dy = 0; return; }
+  const scaled = (mag - dead) / (1 - dead);
+  JOY.dx = (nx / mag) * scaled;
+  JOY.dy = (ny / mag) * scaled;
+}
+
+const DRAG_OFFSET_Y = 70;   // basket sits above the mouse, not hidden under it
 let dragging = false;
 let dragPointerId = null;
 
@@ -749,26 +805,105 @@ canvas.addEventListener('pointerdown', e => {
   const rect = canvas.getBoundingClientRect();
   const px = e.clientX - rect.left, py = e.clientY - rect.top;
   if (Math.hypot(px - SPEAKER.x, py - SPEAKER.y) <= SPEAKER.r) { playInstructions(); return; }
+
+  if (isTouch) {
+    if (Math.hypot(px - PICK_BTN.x, py - PICK_BTN.y) <= PICK_BTN.r + 12) {
+      PICK_BTN.id = e.pointerId;
+      PICK_BTN.flash = 1;
+      canvas.setPointerCapture(e.pointerId);
+      pick();
+      return;
+    }
+    if (px < W * 0.55 && JOY.id === null) {        // the stick comes to the thumb
+      JOY.id = e.pointerId;
+      JOY.x = Math.min(Math.max(px, JOY.r + 12), W - JOY.r - 12);
+      JOY.y = Math.min(Math.max(py, grassTop + JOY.r * 0.4), H - safeBottom - 16);
+      setJoystick(px, py);
+      canvas.setPointerCapture(e.pointerId);
+    }
+    return;
+  }
+
   dragging = true;
   dragPointerId = e.pointerId;
   canvas.setPointerCapture(e.pointerId);
   moveBasketTo(e);
 });
+
 canvas.addEventListener('pointermove', e => {
+  if (JOY.id === e.pointerId) {
+    const rect = canvas.getBoundingClientRect();
+    setJoystick(e.clientX - rect.left, e.clientY - rect.top);
+    return;
+  }
   if (dragging && e.pointerId === dragPointerId) moveBasketTo(e);
 });
-function endDrag(e) {
+
+function endPointer(e) {
+  if (JOY.id === e.pointerId) {
+    JOY.id = null;
+    JOY.kx = JOY.ky = JOY.dx = JOY.dy = 0;
+    JOY.x = JOY.homeX; JOY.y = JOY.homeY;
+  }
+  if (PICK_BTN.id === e.pointerId) PICK_BTN.id = null;
   if (e.pointerId === dragPointerId) { dragging = false; dragPointerId = null; }
 }
-canvas.addEventListener('pointerup', endDrag);
-canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+
+function drawTouchControls(t) {
+  if (!isTouch) return;
+
+  ctx.save();
+  ctx.globalAlpha = JOY.id === null ? 0.55 : 0.85;
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.strokeStyle = 'rgba(138,93,34,0.75)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(JOY.x, JOY.y, JOY.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#ffd93d';
+  ctx.strokeStyle = '#8a5d22';
+  ctx.beginPath();
+  ctx.arc(JOY.x + JOY.kx, JOY.y + JOY.ky, JOY.knobR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  const ready = !!nearestProduce(true);
+  const squash = 1 - PICK_BTN.flash * 0.12;
+  ctx.save();
+  ctx.translate(PICK_BTN.x, PICK_BTN.y);
+  ctx.scale(squash, squash);
+  if (ready) {
+    ctx.strokeStyle = 'rgba(255,255,255,' + (0.55 + Math.sin(t / 220) * 0.3) + ')';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(0, 0, PICK_BTN.r + 9 + Math.sin(t / 220) * 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = ready ? '#ffd93d' : 'rgba(255,255,255,0.8)';
+  ctx.strokeStyle = '#8a5d22';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, PICK_BTN.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.font = Math.round(PICK_BTN.r * 1.05) + 'px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🧺', 0, 3);
+  ctx.restore();
+}
 
 function drawHint() {
   ctx.fillStyle = 'rgba(51,36,46,0.55)';
   ctx.font = 'bold 22px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  const msg = isTouch ? 'Drag your basket to pick the ripe ones!' : 'Arrows to move  •  SPACE to pick the ripe ones';
+  const msg = isTouch ? 'Move with the stick  •  Tap 🧺 to pick the ripe ones'
+                      : 'Arrows to move  •  SPACE to pick the ripe ones';
   ctx.fillText(msg, W / 2, H - 24);
 }
 
@@ -783,10 +918,13 @@ function loop(now) {
   if (keys.right) dx += 1;
   if (keys.up) dy -= 1;
   if (keys.down) dy += 1;
-  if (dx || dy) {
-    const len = Math.hypot(dx, dy);
-    basket.x += (dx / len) * SPEED * dt;
-    basket.y += (dy / len) * SPEED * dt;
+  dx += JOY.dx;
+  dy += JOY.dy;
+  const len = Math.hypot(dx, dy);
+  if (len > 0.001) {
+    const throttle = Math.min(1, len);           // a gentle push on the stick walks slowly
+    basket.x += (dx / len) * throttle * SPEED * dt;
+    basket.y += (dy / len) * throttle * SPEED * dt;
   }
   // basket leans into the turn
   basket.tilt += ((dx ? dx * 0.12 : 0) - basket.tilt) * Math.min(1, dt * 6);
@@ -794,9 +932,11 @@ function loop(now) {
   basket.x = Math.max(BW, Math.min(W - BW, basket.x));
   basket.y = Math.max(grassTop + BH * 0.6, Math.min(H - BH - 10, basket.y));
 
-  if (dragging && !busy) pick(true);
+  if (dragging && !busy) pick(true);        // mouse drag keeps picking on its own
+  if (PICK_BTN.flash > 0) PICK_BTN.flash = Math.max(0, PICK_BTN.flash - dt * 4);
 
   updateKeyboardPos();
+  updateTouchControlPos();
 
   for (const p of plants) {
     for (const item of p.produce) {
@@ -845,6 +985,7 @@ function loop(now) {
   drawShowcase(now);
 
   drawTray(now);
+  drawTouchControls(now);
   if (!isTouch) drawKeyboard();
   drawSpeakerButton();
   drawHint();
@@ -852,6 +993,11 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+/* keep the whole app offline-ready when it is installed to the home screen */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../../sw.js').catch(() => { /* offline support is a bonus */ });
+}
 </script>
 </body>
 </html>

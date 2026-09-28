@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sprout">
+<meta name="theme-color" content="#ffd93d">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
+<title>אותיות!</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: linear-gradient(170deg, #ffe9a8 0%, #ffd2e8 45%, #c9f0ff 100%);
+    font-family: "SF Hebrew", "Arial Hebrew", system-ui, -apple-system, Arial, sans-serif;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* back to the hub — the app has no browser chrome when installed */
+  .back {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    right: calc(env(safe-area-inset-right, 0px) + 10px);
+    z-index: 30;
+    width: 52px; height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    text-decoration: none;
+    color: #33242e;
+    background: rgba(255,255,255,0.85);
+    border-radius: 50%;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.12), 0 6px 14px rgba(0,0,0,0.14);
+  }
+  .back:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.12); }
+
+  .board {
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: calc(env(safe-area-inset-top, 0px) + 74px) 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  }
+  h1 {
+    margin: 0 0 14px;
+    text-align: center;
+    font-size: clamp(26px, 5vw, 40px);
+    color: #6b3fa0;
+    text-shadow: 0 2px 0 rgba(255,255,255,0.8);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(clamp(92px, 13vw, 150px), 1fr));
+    gap: clamp(8px, 1.4vw, 16px);
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .tile {
+    position: relative;
+    border: none;
+    border-radius: 22px;
+    padding: 10px 6px 8px;
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.16), 0 10px 18px rgba(0,0,0,0.14);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+  }
+  .tile:active, .tile.pressed {
+    transform: translateY(5px);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.16), 0 3px 8px rgba(0,0,0,0.14);
+  }
+  .tile .ltr {
+    font-size: clamp(34px, 6.4vw, 66px);
+    font-weight: 700;
+    line-height: 1;
+    text-shadow: 0 3px 0 rgba(0,0,0,0.13);
+  }
+  .tile .pic { font-size: clamp(18px, 3vw, 30px); line-height: 1; }
+
+  /* the big card that opens when a letter is tapped */
+  .card {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: clamp(4px, 1.6vh, 18px);
+    background: rgba(40, 20, 55, 0.55);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    padding: calc(env(safe-area-inset-top, 0px) + 20px) 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  }
+  .card.show { display: flex; }
+  .card .inner {
+    background: #fff;
+    border-radius: 40px;
+    padding: clamp(14px, 3vh, 34px) clamp(24px, 6vw, 70px);
+    text-align: center;
+    box-shadow: 0 14px 0 rgba(0,0,0,0.16), 0 20px 40px rgba(0,0,0,0.3);
+    animation: pop 0.4s cubic-bezier(0.2, 1.5, 0.4, 1);
+    max-width: min(92vw, 620px);
+  }
+  @keyframes pop {
+    0%   { transform: scale(0.4) rotate(-8deg); opacity: 0; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  .card .big {
+    font-size: clamp(90px, 26vh, 230px);
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .card .emoji { font-size: clamp(56px, 15vh, 130px); line-height: 1.1; }
+  .card .word {
+    font-size: clamp(28px, 6vh, 56px);
+    font-weight: 700;
+    color: #33242e;
+    margin-top: 2px;
+  }
+  .card .name { font-size: clamp(18px, 3.4vh, 30px); color: #8a7f93; margin-top: 2px; }
+  .card .again { margin-top: 10px; font-size: clamp(14px, 2.4vh, 19px); color: #b3a8bd; }
+
+  .confetti {
+    position: fixed;
+    z-index: 25;
+    font-size: 26px;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+
+<a class="back" href="../../index.html" aria-label="חזרה למשחקים">←</a>
+
+<div class="board">
+  <h1>אוֹתִיּוֹת! 🎉</h1>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="card" id="card">
+  <div class="inner">
+    <div class="big" id="cardLetter"></div>
+    <div class="emoji" id="cardEmoji"></div>
+    <div class="word" id="cardWord"></div>
+    <div class="name" id="cardName"></div>
+    <div class="again">הקישו כדי לשמוע שוב · הקישו בחוץ כדי לחזור</div>
+  </div>
+</div>
+
+<script>
+/* every letter: the letter, how its name is said, a familiar word and a picture */
+const LETTERS = [
+  { l: 'א', name: 'אָלֶף',  word: 'אַרְיֵה',   pic: '🦁' },
+  { l: 'ב', name: 'בֵּית',   word: 'בַּנָנָה',   pic: '🍌' },
+  { l: 'ג', name: 'גִימֶל',  word: 'גְּלִידָה',  pic: '🍦' },
+  { l: 'ד', name: 'דָלֶת',   word: 'דָּג',      pic: '🐟' },
+  { l: 'ה', name: 'הֵא',     word: 'הַר',      pic: '⛰️' },
+  { l: 'ו', name: 'וָו',     word: 'וֶרֶד',     pic: '🌹' },
+  { l: 'ז', name: 'זַיִן',    word: 'זֶבְּרָה',   pic: '🦓' },
+  { l: 'ח', name: 'חֵית',    word: 'חָתוּל',   pic: '🐱' },
+  { l: 'ט', name: 'טֵית',    word: 'טְרַקְטוֹר', pic: '🚜' },
+  { l: 'י', name: 'יוֹד',    word: 'יַלְדָּה',   pic: '👧' },
+  { l: 'כ', name: 'כַּף',     word: 'כֶּלֶב',    pic: '🐶' },
+  { l: 'ל', name: 'לָמֶד',   word: 'לִימוֹן',  pic: '🍋' },
+  { l: 'מ', name: 'מֵם',     word: 'מָטוֹס',   pic: '✈️' },
+  { l: 'נ', name: 'נוּן',     word: 'נַעַל',     pic: '👟' },
+  { l: 'ס', name: 'סָמֶךְ',   word: 'סוּס',     pic: '🐴' },
+  { l: 'ע', name: 'עַיִן',    word: 'עוּגָה',    pic: '🎂' },
+  { l: 'פ', name: 'פֵּא',     word: 'פַּרְפַּר',   pic: '🦋' },
+  { l: 'צ', name: 'צַדִי',    word: 'צָב',      pic: '🐢' },
+  { l: 'ק', name: 'קוֹף',    word: 'קוֹף',     pic: '🐵' },
+  { l: 'ר', name: 'רֵישׁ',    word: 'רַכֶּבֶת',   pic: '🚂' },
+  { l: 'ש', name: 'שִׁין',    word: 'שֶׁמֶשׁ',    pic: '☀️' },
+  { l: 'ת', name: 'תָו',     word: 'תּוּת',     pic: '🍓' }
+];
+
+const COLORS = [
+  '#ff6b6b', '#ff922b', '#f7b500', '#51cf66', '#20c997',
+  '#22b8cf', '#4dabf7', '#7c6bff', '#cc5de8', '#f06595'
+];
+
+/* ---------- speech: say the letter, then the word ---------- */
+let hebrewVoice = null;
+function pickVoice() {
+  try {
+    const voices = speechSynthesis.getVoices() || [];
+    hebrewVoice = voices.find(v => /^he/i.test(v.lang)) || null;
+  } catch (err) { /* no speech, no problem */ }
+}
+if ('speechSynthesis' in window) {
+  pickVoice();
+  speechSynthesis.addEventListener('voiceschanged', pickVoice);
+}
+
+function say(text, onDone) {
+  if (!('speechSynthesis' in window)) { if (onDone) onDone(); return; }
+  try {
+    const msg = new SpeechSynthesisUtterance(text);
+    msg.lang = 'he-IL';
+    if (hebrewVoice) msg.voice = hebrewVoice;
+    msg.rate = 0.85;
+    msg.pitch = 1.15;
+    if (onDone) { msg.onend = onDone; msg.onerror = onDone; }
+    speechSynthesis.speak(msg);
+  } catch (err) { if (onDone) onDone(); }
+}
+
+/* a little chime, so a tap always answers back even without a Hebrew voice */
+let audioCtx = null;
+function chime(freq) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.16, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.25);
+  } catch (err) { /* no sound, no problem */ }
+}
+
+function speakLetter(entry) {
+  try { speechSynthesis.cancel(); } catch (err) { /* fine */ }
+  chime(700);
+  say(entry.name, () => say(entry.word));
+}
+
+/* ---------- the grid ---------- */
+const grid = document.getElementById('grid');
+LETTERS.forEach((entry, i) => {
+  const b = document.createElement('button');
+  b.className = 'tile';
+  b.style.background = COLORS[i % COLORS.length];
+  b.setAttribute('aria-label', entry.name + ' ' + entry.word);
+  b.innerHTML = '<span class="ltr">' + entry.l + '</span><span class="pic">' + entry.pic + '</span>';
+  b.addEventListener('pointerdown', e => { e.preventDefault(); open(entry, b); });
+  grid.appendChild(b);
+});
+
+/* ---------- the big card ---------- */
+const card = document.getElementById('card');
+const cardLetter = document.getElementById('cardLetter');
+const cardEmoji = document.getElementById('cardEmoji');
+const cardWord = document.getElementById('cardWord');
+const cardName = document.getElementById('cardName');
+let current = null;
+
+function open(entry, tile) {
+  current = entry;
+  cardLetter.textContent = entry.l;
+  cardLetter.style.color = tile.style.background;
+  cardEmoji.textContent = entry.pic;
+  cardWord.textContent = entry.word;
+  cardName.textContent = entry.name;
+  card.classList.add('show');
+  speakLetter(entry);
+  confetti();
+}
+
+card.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (e.target.closest('.inner')) { if (current) speakLetter(current); return; }
+  card.classList.remove('show');
+  current = null;
+  try { speechSynthesis.cancel(); } catch (err) { /* fine */ }
+});
+
+/* ---------- confetti ---------- */
+const BITS = ['🎉', '⭐️', '✨', '🎈', '🌈', '💫'];
+function confetti() {
+  for (let i = 0; i < 16; i++) {
+    const bit = document.createElement('div');
+    bit.className = 'confetti';
+    bit.textContent = BITS[Math.floor(Math.random() * BITS.length)];
+    bit.style.left = (10 + Math.random() * 80) + 'vw';
+    bit.style.top = '50vh';
+    document.body.appendChild(bit);
+    const dx = (Math.random() - 0.5) * 320;
+    const dy = -140 - Math.random() * 260;
+    bit.animate([
+      { transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+      { transform: 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (Math.random() * 720 - 360) + 'deg)', opacity: 1, offset: 0.65 },
+      { transform: 'translate(' + (dx * 1.25) + 'px, 60vh) rotate(' + (Math.random() * 720 - 360) + 'deg)', opacity: 0 }
+    ], { duration: 1600 + Math.random() * 700, easing: 'cubic-bezier(0.2, 0.7, 0.4, 1)' })
+      .addEventListener('finish', () => bit.remove());
+  }
+}
+
+/* keep the whole app offline-ready when it is installed to the home screen */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../../sw.js').catch(() => { /* offline support is a bonus */ });
+}
+</script>
+</body>
+</html>

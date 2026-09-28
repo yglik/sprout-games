@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sprout">
+<meta name="theme-color" content="#efe4d3">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
 <title>Poster Paint!</title>
 <style>
   * { box-sizing: border-box; }
@@ -73,6 +78,9 @@
     box-shadow: 0 2px 3px rgba(0,0,0,0.15);
   }
   .tool.on { background: #33242e; border-color: #33242e; color: #ffd93d; }
+  .tool.arm { background: #ff6b6b; border-color: #c92a2a; color: #fff; }
+  a.tool { display: flex; align-items: center; justify-content: center; text-decoration: none; color: #33242e; }
+  .sidebar .back-wrap { flex: 0 0 auto; padding-bottom: 6px; margin-top: env(safe-area-inset-top, 0px); }
   .canvas-wrap { position: relative; flex: 1; min-width: 0; }
   canvas {
     display: block;
@@ -96,6 +104,7 @@
 <body>
 <div class="app">
   <div class="sidebar">
+    <div class="back-wrap"><a class="tool" href="../../index.html" aria-label="Back to games">←</a></div>
     <div class="palette" id="palette"></div>
     <div class="divider"></div>
     <div class="tools">
@@ -427,27 +436,42 @@ const SAVE_KEY = 'posterPaintSnapshot', MODE_KEY = 'posterPaintSpectral';
 function saveSnapshot() {
   try { localStorage.setItem(SAVE_KEY, canvas.toDataURL('image/png')); } catch (err) { /* storage full, no problem */ }
 }
+let hasPainted = false;
 function loadSaved() {
   try {
     const data = localStorage.getItem(SAVE_KEY);
     if (!data) return;
     const img = new Image();
-    img.onload = () => ctx.drawImage(img, 0, 0, W, H);
+    img.onload = () => { if (!hasPainted) ctx.drawImage(img, 0, 0, W, H); };
     img.src = data;
   } catch (err) { /* nothing saved, no problem */ }
 }
+
+// the iPad can drop the page from memory at any moment — keep the paint safe
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveSnapshot(); });
+window.addEventListener('pagehide', saveSnapshot);
 try { spectral = localStorage.getItem(MODE_KEY) === '1'; } catch (err) { /* no storage, stay simple */ }
 
-/* ---------- canvas sizing (keeps the painting when the iPad rotates) ---------- */
+/* ---------- canvas sizing (keeps the painting when the iPad rotates) ----------
+   The old bitmap is copied into an offscreen canvas and drawn back in the same
+   tick. An <img> round trip is asynchronous, so a second resize arriving first
+   used to snapshot a blank canvas and the painting was gone. */
 let W = 0, H = 0, initialized = false;
 function resize() {
   const dpr = window.devicePixelRatio || 1;
   const rect = wrap.getBoundingClientRect();
   const newW = Math.max(1, Math.round(rect.width)), newH = Math.max(1, Math.round(rect.height));
-  if (initialized && newW === W && newH === H) return;   // duplicate fire from the 3 resize sources
+  // ignore the few-pixel wobble iPadOS sends while a finger is down
+  if (initialized && Math.abs(newW - W) <= 8 && Math.abs(newH - H) <= 8) return;
 
-  let prevURL = null;
-  if (initialized) { try { prevURL = canvas.toDataURL('image/png'); } catch (err) { /* no snapshot */ } }
+  let prev = null;
+  const prevW = W, prevH = H;
+  if (initialized && canvas.width > 0 && canvas.height > 0) {
+    prev = document.createElement('canvas');
+    prev.width = canvas.width;
+    prev.height = canvas.height;
+    prev.getContext('2d').drawImage(canvas, 0, 0);
+  }
 
   W = newW; H = newH;
   canvas.width = Math.round(W * dpr);
@@ -459,10 +483,12 @@ function resize() {
   ctx.fillRect(0, 0, W, H);
   initGrid();
 
-  if (prevURL) {
-    const img = new Image();
-    img.onload = () => ctx.drawImage(img, 0, 0, W, H);
-    img.src = prevURL;
+  if (prev) {
+    // fit the old painting into the new paper without squashing it
+    const k = Math.min(W / prevW, H / prevH);
+    const w = prevW * k, h = prevH * k;
+    ctx.drawImage(prev, (W - w) / 2, (H - h) / 2, w, h);
+    saveSnapshot();
   } else if (!initialized) {
     loadSaved();
   }
@@ -489,7 +515,7 @@ function pressureOf(e, x, y) {
   return p;
 }
 canvas.addEventListener('pointerdown', e => {
-  drawing = true; activeId = e.pointerId;
+  drawing = true; activeId = e.pointerId; hasPainted = true;
   canvas.setPointerCapture(e.pointerId);
   const r = canvas.getBoundingClientRect();
   const x = e.clientX - r.left, y = e.clientY - r.top;
@@ -523,19 +549,45 @@ function clearPaper() {
   initGrid();
   saveSnapshot();
 }
-document.getElementById('clearBtn').addEventListener('pointerdown', e => { e.preventDefault(); clearPaper(); });
+const clearBtn = document.getElementById('clearBtn');
+let clearArmed = false, clearTimer = null;
+function disarmClear() {
+  clearArmed = false;
+  clearBtn.classList.remove('arm');
+  clearBtn.textContent = '🧹';
+  clearTimeout(clearTimer);
+}
+clearBtn.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (clearArmed) {
+    disarmClear();
+    clearPaper();
+    hasPainted = false;
+    showTag('cleared — a fresh sheet');
+    return;
+  }
+  clearArmed = true;
+  clearBtn.classList.add('arm');
+  clearBtn.textContent = '?';
+  showTag('tap the broom again to clear everything');
+  clearTimeout(clearTimer);
+  clearTimer = setTimeout(disarmClear, 3000);
+});
 
 const modeBtn = document.getElementById('modeBtn');
 const modeTag = document.getElementById('modeTag');
 let tagTimer = null;
+function showTag(text) {
+  modeTag.textContent = text;
+  modeTag.classList.add('show');
+  clearTimeout(tagTimer);
+  tagTimer = setTimeout(() => modeTag.classList.remove('show'), 2200);
+}
 function applyMode() {
   modeBtn.classList.toggle('on', spectral);
   paintSwatches();
   initGrid();                                  // wet-paint memory is per-engine, so it restarts
-  modeTag.textContent = spectral ? 'real paint mixing (Kubelka–Munk)' : 'colour-wheel mixing (RYB)';
-  modeTag.classList.add('show');
-  clearTimeout(tagTimer);
-  tagTimer = setTimeout(() => modeTag.classList.remove('show'), 2200);
+  showTag(spectral ? 'real paint mixing (Kubelka–Munk)' : 'colour-wheel mixing (RYB)');
 }
 modeBtn.addEventListener('pointerdown', e => {
   e.preventDefault();
@@ -544,6 +596,11 @@ modeBtn.addEventListener('pointerdown', e => {
   applyMode();
 });
 applyMode();
+
+/* keep the whole app offline-ready when it is installed to the home screen */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../../sw.js').catch(() => { /* offline support is a bonus */ });
+}
 </script>
 </body>
 </html>

@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#ffe9c7">
 <link rel="manifest" href="../../manifest.webmanifest">
 <link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
+<link rel="stylesheet" href="../../shared/sprout-ui.css">
 <title>Count the Fruit!</title>
 <style>
   html, body {
@@ -24,23 +25,25 @@
     -webkit-touch-callout: none;
   }
   canvas { display: block; touch-action: none; -webkit-tap-highlight-color: transparent; }
-  .back {
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 10px);
-    left: calc(env(safe-area-inset-left, 0px) + 10px);
-    z-index: 10;
-    width: 52px; height: 52px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 26px; text-decoration: none; color: #33242e;
-    background: rgba(255,255,255,0.85);
-    border-radius: 50%;
-    box-shadow: 0 3px 0 rgba(0,0,0,0.12), 0 6px 14px rgba(0,0,0,0.14);
-  }
-  .back:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.12); }
 </style>
 </head>
 <body>
-<a class="back" href="../../index.html" aria-label="Back to games">←</a>
+<script>
+window.sproutConfig = {
+  game: 'count-fruits',
+  title: 'Count the Fruit!',
+  home: '../../index.html',
+  accent: '#ff922b',
+  context: () => ({
+    answer: target,
+    fruit: fruit && fruit.name,
+    onScreen: items.length,
+    stars: stars,
+    lastWrongKey: wrongKey < 0 ? null : wrongKey
+  })
+};
+</script>
+<script src="../../shared/sprout-ui.js"></script>
 <canvas id="game"></canvas>
 <script>
 const canvas = document.getElementById('game');
@@ -443,10 +446,16 @@ function drawItems(t) {
   }
 }
 
+function navTop() {
+  const nav = document.querySelector('.sprout-nav');
+  return nav ? nav.getBoundingClientRect().height : 0;
+}
+
 function drawStars() {
   const n = Math.min(stars, 10);
+  const top = navTop() + 14;
   for (let i = 0; i < n; i++) {
-    const x = 34 + i * 34, y = 34;
+    const x = 34 + i * 34, y = top;
     ctx.save();
     ctx.translate(x, y);
     ctx.fillStyle = '#ffd93d';
@@ -469,7 +478,7 @@ function drawStars() {
     ctx.font = 'bold 20px system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText('+' + (stars - 10), 34 + 10 * 34 - 12, 34);
+    ctx.fillText('+' + (stars - 10), 34 + 10 * 34 - 12, top);
   }
 }
 

@@ -108,3 +108,38 @@ cheap 304. The same config also serves `.webmanifest` as
 Note that an app resumed from the background is not a fresh load: the page that
 is already on screen stays as it is until it navigates (tap ← and go back in) or
 the app is closed from the app switcher.
+
+## Shared chrome: nav stripe and feedback
+
+Every page loads `shared/sprout-ui.css` + `shared/sprout-ui.js`, which add the
+same slim stripe to all of them: back to the hub, the game's name, and a 💬
+button. Pages keep their own content clear of it with `var(--sprout-top)`
+(canvas games measure the stripe instead, since they draw in device pixels).
+
+A page configures the stripe by setting `window.sproutConfig` before loading the
+script:
+
+```html
+<script>
+window.sproutConfig = {
+  game: 'garden-pick', title: 'Garden Pick!', home: '../../index.html',
+  accent: '#5cb83e',
+  context: () => ({ picked: collected.length })   // whatever the game knows now
+};
+</script>
+<script src="../../shared/sprout-ui.js"></script>
+```
+
+The 💬 button opens a sheet for a written note, a voice recording (up to 90s,
+recorded with MediaRecorder), or both. Each submission carries the game's own
+`context()` plus screen size, orientation, whether it is running as an installed
+app, language, user agent and how long the page had been open. The sheet shows
+exactly what will be sent under "What gets sent with this". If the iPad is
+offline the submission is queued in `localStorage` and retried on the next load.
+
+Submissions go to `POST /api/feedback` on the VPS, handled by
+`server/feedback_server.py` (Python stdlib, systemd unit `sprout-feedback`,
+listening on 127.0.0.1:3031). Each one becomes a directory under
+`/var/lib/sprout-feedback/` holding `feedback.json` and any recording. Review
+them at `https://sprout-games.yochai.net/feedback/`, which nginx keeps behind
+basic auth.

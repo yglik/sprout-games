@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#ffd93d">
 <link rel="manifest" href="../../manifest.webmanifest">
 <link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
+<link rel="stylesheet" href="../../shared/sprout-ui.css">
 <title>אותיות!</title>
 <style>
   * { box-sizing: border-box; }
@@ -26,28 +27,12 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* back to the hub — the app has no browser chrome when installed */
-  .back {
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 10px);
-    right: calc(env(safe-area-inset-right, 0px) + 10px);
-    z-index: 30;
-    width: 52px; height: 52px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 26px;
-    text-decoration: none;
-    color: #33242e;
-    background: rgba(255,255,255,0.85);
-    border-radius: 50%;
-    box-shadow: 0 3px 0 rgba(0,0,0,0.12), 0 6px 14px rgba(0,0,0,0.14);
-  }
-  .back:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.12); }
 
   .board {
     height: 100%;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: calc(env(safe-area-inset-top, 0px) + 74px) 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+    padding: calc(var(--sprout-top) + 18px) 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
   }
   h1 {
     margin: 0 0 14px;
@@ -105,7 +90,7 @@
     background: rgba(40, 20, 55, 0.55);
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(3px);
-    padding: calc(env(safe-area-inset-top, 0px) + 20px) 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+    padding: calc(var(--sprout-top) + 14px) 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
   }
   .card.show { display: flex; }
   .card .inner {
@@ -169,7 +154,21 @@
 </head>
 <body>
 
-<a class="back" href="../../index.html" aria-label="חזרה למשחקים">←</a>
+<script>
+window.sproutConfig = {
+  game: 'hebrew-letters',
+  title: 'אותיות!',
+  home: '../../index.html',
+  accent: '#cc5de8',
+  context: () => ({
+    openLetter: current ? current.l : null,
+    openLetterName: current ? current.name : null,
+    recordingsLoaded: Object.keys(letterAudio).length,
+    hebrewVoice: hebrewVoice ? hebrewVoice.name : null
+  })
+};
+</script>
+<script src="../../shared/sprout-ui.js"></script>
 
 <div class="board">
   <h1>אוֹתִיּוֹת! 🎉</h1>

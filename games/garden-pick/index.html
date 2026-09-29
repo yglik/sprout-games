@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#7fd8f7">
 <link rel="manifest" href="../../manifest.webmanifest">
 <link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
+<link rel="stylesheet" href="../../shared/sprout-ui.css">
 <title>Garden Pick!</title>
 <style>
   html, body {
@@ -25,23 +26,25 @@
   }
   canvas { display: block; touch-action: none; -webkit-tap-highlight-color: transparent; }
   body { --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px); }
-  .back {
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 10px);
-    left: calc(env(safe-area-inset-left, 0px) + 10px);
-    z-index: 10;
-    width: 52px; height: 52px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 26px; text-decoration: none; color: #33242e;
-    background: rgba(255,255,255,0.85);
-    border-radius: 50%;
-    box-shadow: 0 3px 0 rgba(0,0,0,0.12), 0 6px 14px rgba(0,0,0,0.14);
-  }
-  .back:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.12); }
 </style>
 </head>
 <body>
-<a class="back" href="../../index.html" aria-label="Back to games">←</a>
+<script>
+window.sproutConfig = {
+  game: 'garden-pick',
+  title: 'Garden Pick!',
+  home: '../../index.html',
+  accent: '#5cb83e',
+  context: () => ({
+    picked: collected.length,
+    pickedByCrop: CROPS.reduce((acc, c, i) => (acc[c.id] = collected.filter(x => x.cropIdx === i).length, acc), {}),
+    ripeOnScreen: plants.reduce((n, p) => n + p.produce.filter(x => x.ripe && !x.picked).length, 0),
+    showcaseOpen: !!showcase,
+    controls: isTouch ? 'joystick' : 'keyboard'
+  })
+};
+</script>
+<script src="../../shared/sprout-ui.js"></script>
 <canvas id="game"></canvas>
 <script>
 const canvas = document.getElementById('game');
@@ -52,7 +55,9 @@ const SPEAKER = { x: 50, y: 50, r: 28 };
 let safeTop = 0, safeBottom = 0;
 function readSafeArea() {
   const cs = getComputedStyle(document.body);
-  safeTop = parseFloat(cs.getPropertyValue('--sat')) || 0;
+  const nav = document.querySelector('.sprout-nav');
+  // the shared stripe already includes the safe-area inset in its height
+  safeTop = nav ? nav.getBoundingClientRect().height : (parseFloat(cs.getPropertyValue('--sat')) || 0);
   safeBottom = parseFloat(cs.getPropertyValue('--sab')) || 0;
 }
 function updateSpeakerPos() { SPEAKER.x = W / 2; SPEAKER.y = safeTop + 46; }

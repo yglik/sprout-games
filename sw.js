@@ -1,10 +1,12 @@
 /* Sprout Games service worker: the games keep working with no network,
    but a fresh deploy still wins over the cache for pages. */
-const CACHE = 'sprout-games-v3';
+const CACHE = 'sprout-games-v4';
 const SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './shared/sprout-ui.css',
+  './shared/sprout-ui.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',

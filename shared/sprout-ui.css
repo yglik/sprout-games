@@ -1,0 +1,141 @@
+/* Shared chrome for every Sprout game: the nav stripe and the feedback sheet.
+   Pages read --sprout-top to keep their own content clear of the stripe. */
+:root {
+  --sprout-nav-h: 46px;
+  --sprout-top: calc(env(safe-area-inset-top, 0px) + var(--sprout-nav-h));
+  --sprout-ink: #33242e;
+  --sprout-accent: #4dabf7;
+}
+
+.sprout-nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 2147483000;
+  height: var(--sprout-top);
+  padding: env(safe-area-inset-top, 0px) calc(env(safe-area-inset-right, 0px) + 8px) 0 calc(env(safe-area-inset-left, 0px) + 8px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: saturate(160%) blur(10px);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08), 0 2px 10px rgba(0, 0, 0, 0.06);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.sprout-nav .sn-btn {
+  flex: 0 0 auto;
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--sprout-ink);
+  font-size: 19px;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sprout-nav .sn-btn:active { transform: scale(0.92); background: rgba(0, 0, 0, 0.12); }
+.sprout-nav .sn-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sprout-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sprout-nav .sn-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--sprout-accent);
+  flex: 0 0 auto;
+  margin-inline-start: 2px;
+}
+
+/* ---------- feedback sheet ---------- */
+.sprout-fb {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483001;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(30, 20, 40, 0.45);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
+.sprout-fb.show { display: flex; }
+.sprout-fb .fb-card {
+  width: min(560px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: #fffdf8;
+  border-radius: 22px 22px 0 0;
+  padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 18px);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25);
+  animation: fbUp 0.22s ease-out;
+}
+@media (min-width: 620px) {
+  .sprout-fb { align-items: center; }
+  .sprout-fb .fb-card { border-radius: 22px; }
+}
+@keyframes fbUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.sprout-fb h2 { margin: 0 0 2px; font-size: 19px; color: var(--sprout-ink); }
+.sprout-fb .fb-sub { margin: 0 0 12px; font-size: 13px; color: #8a7f93; }
+.sprout-fb textarea {
+  width: 100%;
+  min-height: 92px;
+  border: 2px solid #e6dfd2;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 16px;                /* 16px keeps iOS from zooming on focus */
+  color: var(--sprout-ink);
+  background: #fff;
+  resize: vertical;
+}
+.sprout-fb textarea:focus { outline: none; border-color: var(--sprout-accent); }
+.sprout-fb .fb-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.sprout-fb .fb-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 11px 18px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  background: #efe7da;
+  color: var(--sprout-ink);
+}
+.sprout-fb .fb-btn:active { transform: scale(0.97); }
+.sprout-fb .fb-btn[disabled] { opacity: 0.5; cursor: default; }
+.sprout-fb .fb-send { background: #51cf66; color: #06331a; }
+.sprout-fb .fb-rec.on { background: #ff6b6b; color: #fff; }
+.sprout-fb .fb-time { font-variant-numeric: tabular-nums; font-size: 14px; color: #8a7f93; }
+.sprout-fb audio { width: 100%; margin-top: 10px; }
+.sprout-fb .fb-what {
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: #8a7f93;
+}
+.sprout-fb .fb-what summary { cursor: pointer; }
+.sprout-fb .fb-what pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f4efe5;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin: 8px 0 0;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 11.5px;
+  color: #6b6270;
+}
+.sprout-fb .fb-note { margin-top: 10px; font-size: 13px; font-weight: 600; min-height: 18px; }
+.sprout-fb .fb-note.ok { color: #2b8a3e; }
+.sprout-fb .fb-note.bad { color: #c92a2a; }

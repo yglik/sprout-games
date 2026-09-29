@@ -11,8 +11,10 @@ or serve as a static file.
   (credits in `games/garden-pick/img/CREDITS.md`).
 - **[Count the Fruit!](games/count-fruits/index.html)** — count the fruit shown on screen
   and tap the matching number on an on-screen keypad.
-- **[אותיות! / Hebrew Letters](games/hebrew-letters/index.html)** — tap a Hebrew letter to see a
-  familiar picture and hear the letter and the word spoken out loud (uses the device's Hebrew voice).
+- **[אותיות! / Hebrew Letters](games/hebrew-letters/index.html)** — tap a Hebrew letter to see three
+  familiar pictures and hear the letter said out loud in a real recorded voice (`audio/`, one file per
+  letter, listed in `audio/letters.json`). Tapping a picture says its word with the device's Hebrew
+  voice; if a recording is missing, the voice reads the letter too, so the game works either way.
 - **[Poster Paint!](games/poster-paint/index.html)** — paint with a single bristle brush
   and a 9-color palette; colors mix like real pigment (blue + yellow = green, and so on).
   The 🔬 button switches the mixing engine between the two models below.

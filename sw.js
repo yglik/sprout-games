@@ -1,6 +1,6 @@
 /* Sprout Games service worker: the games keep working with no network,
    but a fresh deploy still wins over the cache for pages. */
-const CACHE = 'sprout-games-v1';
+const CACHE = 'sprout-games-v2';
 const SHELL = [
   './',
   './index.html',
@@ -20,7 +20,30 @@ const SHELL = [
   './games/garden-pick/watermelon.m4a',
   './games/count-fruits/index.html',
   './games/poster-paint/index.html',
-  './games/hebrew-letters/index.html'
+  './games/hebrew-letters/index.html',
+  './games/hebrew-letters/audio/letters.json',
+  './games/hebrew-letters/audio/alef.m4a',
+  './games/hebrew-letters/audio/ayin.m4a',
+  './games/hebrew-letters/audio/bet.m4a',
+  './games/hebrew-letters/audio/dalet.m4a',
+  './games/hebrew-letters/audio/gimel.m4a',
+  './games/hebrew-letters/audio/he.m4a',
+  './games/hebrew-letters/audio/het.m4a',
+  './games/hebrew-letters/audio/kaf.m4a',
+  './games/hebrew-letters/audio/lamed.m4a',
+  './games/hebrew-letters/audio/mem.m4a',
+  './games/hebrew-letters/audio/nun.m4a',
+  './games/hebrew-letters/audio/pe.m4a',
+  './games/hebrew-letters/audio/qof.m4a',
+  './games/hebrew-letters/audio/resh.m4a',
+  './games/hebrew-letters/audio/samekh.m4a',
+  './games/hebrew-letters/audio/shin.m4a',
+  './games/hebrew-letters/audio/tav.m4a',
+  './games/hebrew-letters/audio/tet.m4a',
+  './games/hebrew-letters/audio/tsadi.m4a',
+  './games/hebrew-letters/audio/vav.m4a',
+  './games/hebrew-letters/audio/yod.m4a',
+  './games/hebrew-letters/audio/zayin.m4a'
 ];
 
 self.addEventListener('install', event => {

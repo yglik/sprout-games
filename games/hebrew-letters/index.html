@@ -58,7 +58,7 @@
   }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(clamp(92px, 13vw, 150px), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(clamp(112px, 15vw, 180px), 1fr));
     gap: clamp(8px, 1.4vw, 16px);
     max-width: 1100px;
     margin: 0 auto;
@@ -85,12 +85,12 @@
     box-shadow: 0 1px 0 rgba(0,0,0,0.16), 0 3px 8px rgba(0,0,0,0.14);
   }
   .tile .ltr {
-    font-size: clamp(34px, 6.4vw, 66px);
+    font-size: clamp(30px, 5.2vw, 56px);
     font-weight: 700;
     line-height: 1;
     text-shadow: 0 3px 0 rgba(0,0,0,0.13);
   }
-  .tile .pic { font-size: clamp(18px, 3vw, 30px); line-height: 1; }
+  .tile .pic { font-size: clamp(40px, 7.4vw, 84px); line-height: 1.05; }
 
   /* the big card that opens when a letter is tapped */
   .card {
@@ -127,12 +127,33 @@
     line-height: 1;
     margin-bottom: 4px;
   }
-  .card .emoji { font-size: clamp(56px, 15vh, 130px); line-height: 1.1; }
-  .card .word {
-    font-size: clamp(28px, 6vh, 56px);
+  .card .pics {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: clamp(8px, 2.5vw, 30px);
+    margin-top: 4px;
+  }
+  .card .picBtn {
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    padding: 6px 10px;
+    border-radius: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease, background 0.12s ease;
+  }
+  .card .picBtn:active { transform: scale(0.92); background: #fdf1c9; }
+  .card .picBtn .pe { font-size: clamp(46px, 12vh, 104px); line-height: 1.1; }
+  .card .picBtn .pw {
+    font-size: clamp(18px, 3.4vh, 34px);
     font-weight: 700;
     color: #33242e;
-    margin-top: 2px;
   }
   .card .name { font-size: clamp(18px, 3.4vh, 30px); color: #8a7f93; margin-top: 2px; }
   .card .again { margin-top: 10px; font-size: clamp(14px, 2.4vh, 19px); color: #b3a8bd; }
@@ -158,38 +179,37 @@
 <div class="card" id="card">
   <div class="inner">
     <div class="big" id="cardLetter"></div>
-    <div class="emoji" id="cardEmoji"></div>
-    <div class="word" id="cardWord"></div>
+    <div class="pics" id="cardPics"></div>
     <div class="name" id="cardName"></div>
-    <div class="again">הקישו כדי לשמוע שוב · הקישו בחוץ כדי לחזור</div>
+    <div class="again">הקישו על תמונה כדי לשמוע · הקישו בחוץ כדי לחזור</div>
   </div>
 </div>
 
 <script>
 /* every letter: the letter, how its name is said, a familiar word and a picture */
 const LETTERS = [
-  { l: 'א', name: 'אָלֶף',  word: 'אַרְיֵה',   pic: '🦁' },
-  { l: 'ב', name: 'בֵּית',   word: 'בַּנָנָה',   pic: '🍌' },
-  { l: 'ג', name: 'גִימֶל',  word: 'גְּלִידָה',  pic: '🍦' },
-  { l: 'ד', name: 'דָלֶת',   word: 'דָּג',      pic: '🐟' },
-  { l: 'ה', name: 'הֵא',     word: 'הַר',      pic: '⛰️' },
-  { l: 'ו', name: 'וָו',     word: 'וֶרֶד',     pic: '🌹' },
-  { l: 'ז', name: 'זַיִן',    word: 'זֶבְּרָה',   pic: '🦓' },
-  { l: 'ח', name: 'חֵית',    word: 'חָתוּל',   pic: '🐱' },
-  { l: 'ט', name: 'טֵית',    word: 'טְרַקְטוֹר', pic: '🚜' },
-  { l: 'י', name: 'יוֹד',    word: 'יַלְדָּה',   pic: '👧' },
-  { l: 'כ', name: 'כַּף',     word: 'כֶּלֶב',    pic: '🐶' },
-  { l: 'ל', name: 'לָמֶד',   word: 'לִימוֹן',  pic: '🍋' },
-  { l: 'מ', name: 'מֵם',     word: 'מָטוֹס',   pic: '✈️' },
-  { l: 'נ', name: 'נוּן',     word: 'נַעַל',     pic: '👟' },
-  { l: 'ס', name: 'סָמֶךְ',   word: 'סוּס',     pic: '🐴' },
-  { l: 'ע', name: 'עַיִן',    word: 'עוּגָה',    pic: '🎂' },
-  { l: 'פ', name: 'פֵּא',     word: 'פַּרְפַּר',   pic: '🦋' },
-  { l: 'צ', name: 'צַדִי',    word: 'צָב',      pic: '🐢' },
-  { l: 'ק', name: 'קוֹף',    word: 'קוֹף',     pic: '🐵' },
-  { l: 'ר', name: 'רֵישׁ',    word: 'רַכֶּבֶת',   pic: '🚂' },
-  { l: 'ש', name: 'שִׁין',    word: 'שֶׁמֶשׁ',    pic: '☀️' },
-  { l: 'ת', name: 'תָו',     word: 'תּוּת',     pic: '🍓' }
+  { l: 'א', id: 'alef',   name: 'אָלֶף',  pics: [['אַרְיֵה', '🦁'], ['אוֹטוֹבּוּס', '🚌'], ['אֲנָנָס', '🍍']] },
+  { l: 'ב', id: 'bet',    name: 'בֵּית',   pics: [['בַּנָנָה', '🍌'], ['בַּיִת', '🏠'], ['בַּלּוֹן', '🎈']] },
+  { l: 'ג', id: 'gimel',  name: 'גִימֶל',  pics: [['גְּלִידָה', '🍦'], ['גֶּזֶר', '🥕'], ['גִּיטָרָה', '🎸']] },
+  { l: 'ד', id: 'dalet',  name: 'דָלֶת',   pics: [['דָּג', '🐟'], ['דֹּב', '🐻'], ['דֶּלֶת', '🚪']] },
+  { l: 'ה', id: 'he',     name: 'הֵא',     pics: [['הַר', '⛰️'], ['הֶלִיקוֹפְּטֶר', '🚁'], ['הַמְבּוּרְגֶּר', '🍔']] },
+  { l: 'ו', id: 'vav',    name: 'וָו',     pics: [['וֶרֶד', '🌹'], ['וָפֶל', '🧇'], ['וִילוֹן', '🪟']] },
+  { l: 'ז', id: 'zayin',  name: 'זַיִן',    pics: [['זֶבְּרָה', '🦓'], ['זְאֵב', '🐺'], ['זֵר', '💐']] },
+  { l: 'ח', id: 'het',    name: 'חֵית',    pics: [['חָתוּל', '🐱'], ['חֲזִיר', '🐷'], ['חָלָב', '🥛']] },
+  { l: 'ט', id: 'tet',    name: 'טֵית',    pics: [['טְרַקְטוֹר', '🚜'], ['טֶלֶפוֹן', '☎️'], ['טַוָּס', '🦚']] },
+  { l: 'י', id: 'yod',    name: 'יוֹד',    pics: [['יַלְדָּה', '👧'], ['יָרֵחַ', '🌙'], ['יוֹנָה', '🕊️']] },
+  { l: 'כ', id: 'kaf',    name: 'כַּף',     pics: [['כֶּלֶב', '🐶'], ['כִּסֵּא', '🪑'], ['כֶּתֶר', '👑']] },
+  { l: 'ל', id: 'lamed',  name: 'לָמֶד',   pics: [['לִימוֹן', '🍋'], ['לֵב', '❤️'], ['לִוְיָתָן', '🐋']] },
+  { l: 'מ', id: 'mem',    name: 'מֵם',     pics: [['מָטוֹס', '✈️'], ['מַפְתֵּחַ', '🔑'], ['מִטְרִיָּה', '☂️']] },
+  { l: 'נ', id: 'nun',    name: 'נוּן',     pics: [['נַעַל', '👟'], ['נֵר', '🕯️'], ['נָמֵר', '🐆']] },
+  { l: 'ס', id: 'samekh', name: 'סָמֶךְ',   pics: [['סוּס', '🐴'], ['סֵפֶר', '📖'], ['סֻכָּרִיָּה', '🍬']] },
+  { l: 'ע', id: 'ayin',   name: 'עַיִן',    pics: [['עוּגָה', '🎂'], ['עֵץ', '🌳'], ['עֲנָבִים', '🍇']] },
+  { l: 'פ', id: 'pe',     name: 'פֵּא',     pics: [['פַּרְפַּר', '🦋'], ['פִּיל', '🐘'], ['פִּיצָה', '🍕']] },
+  { l: 'צ', id: 'tsadi',  name: 'צַדִי',    pics: [['צָב', '🐢'], ['צִפּוֹר', '🐦'], ['צְדָפָה', '🐚']] },
+  { l: 'ק', id: 'qof',    name: 'קוֹף',    pics: [['קוֹף', '🐵'], ['קֶשֶׁת', '🌈'], ['קֻבִּיָּה', '🎲']] },
+  { l: 'ר', id: 'resh',   name: 'רֵישׁ',    pics: [['רַכֶּבֶת', '🚂'], ['רוֹבּוֹט', '🤖'], ['רֶגֶל', '🦵']] },
+  { l: 'ש', id: 'shin',   name: 'שִׁין',    pics: [['שֶׁמֶשׁ', '☀️'], ['שׁוֹקוֹלָד', '🍫'], ['שָׁעוֹן', '⌚']] },
+  { l: 'ת', id: 'tav',    name: 'תָו',     pics: [['תּוּת', '🍓'], ['תַּפּוּחַ', '🍎'], ['תַּרְנְגוֹל', '🐓']] }
 ];
 
 const COLORS = [
@@ -240,10 +260,42 @@ function chime(freq) {
   } catch (err) { /* no sound, no problem */ }
 }
 
+/* audio/letters.json maps a letter id to a recorded file in audio/.
+   Without it (or for a letter it does not list) the device's voice reads the
+   letter instead, so the game works either way. */
+let letterAudio = {};
+fetch('audio/letters.json')
+  .then(r => (r.ok ? r.json() : null))
+  .then(map => { if (map && typeof map === 'object') letterAudio = map; })
+  .catch(() => { /* no recordings, the voice reads the letters */ });
+
+let playing = null;
+function playLetterSound(entry, onDone) {
+  const file = letterAudio[entry.id];
+  if (!file) { say(entry.name, onDone); return; }
+  try {
+    if (playing) { playing.pause(); playing = null; }
+    const a = new Audio('audio/' + file);
+    playing = a;
+    a.onended = onDone;
+    a.onerror = () => say(entry.name, onDone);
+    a.play().catch(() => say(entry.name, onDone));
+  } catch (err) {
+    say(entry.name, onDone);
+  }
+}
+
 function speakLetter(entry) {
   try { speechSynthesis.cancel(); } catch (err) { /* fine */ }
   chime(700);
-  say(entry.name, () => say(entry.word));
+  playLetterSound(entry, () => say(entry.pics[0][0]));
+}
+
+function speakWord(word) {
+  try { speechSynthesis.cancel(); } catch (err) { /* fine */ }
+  if (playing) { try { playing.pause(); } catch (err) { /* fine */ } playing = null; }
+  chime(880);
+  say(word);
 }
 
 /* ---------- the grid ---------- */
@@ -252,8 +304,8 @@ LETTERS.forEach((entry, i) => {
   const b = document.createElement('button');
   b.className = 'tile';
   b.style.background = COLORS[i % COLORS.length];
-  b.setAttribute('aria-label', entry.name + ' ' + entry.word);
-  b.innerHTML = '<span class="ltr">' + entry.l + '</span><span class="pic">' + entry.pic + '</span>';
+  b.setAttribute('aria-label', entry.name + ' ' + entry.pics[0][0]);
+  b.innerHTML = '<span class="ltr">' + entry.l + '</span><span class="pic">' + entry.pics[0][1] + '</span>';
   b.addEventListener('pointerdown', e => { e.preventDefault(); open(entry, b); });
   grid.appendChild(b);
 });
@@ -261,8 +313,7 @@ LETTERS.forEach((entry, i) => {
 /* ---------- the big card ---------- */
 const card = document.getElementById('card');
 const cardLetter = document.getElementById('cardLetter');
-const cardEmoji = document.getElementById('cardEmoji');
-const cardWord = document.getElementById('cardWord');
+const cardPics = document.getElementById('cardPics');
 const cardName = document.getElementById('cardName');
 let current = null;
 
@@ -270,8 +321,15 @@ function open(entry, tile) {
   current = entry;
   cardLetter.textContent = entry.l;
   cardLetter.style.color = tile.style.background;
-  cardEmoji.textContent = entry.pic;
-  cardWord.textContent = entry.word;
+  cardPics.innerHTML = '';
+  entry.pics.forEach(([word, emoji]) => {
+    const b = document.createElement('button');
+    b.className = 'picBtn';
+    b.setAttribute('aria-label', word);
+    b.innerHTML = '<span class="pe">' + emoji + '</span><span class="pw">' + word + '</span>';
+    b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); speakWord(word); });
+    cardPics.appendChild(b);
+  });
   cardName.textContent = entry.name;
   card.classList.add('show');
   speakLetter(entry);

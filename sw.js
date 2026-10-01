@@ -1,6 +1,6 @@
 /* Sprout Games service worker: the games keep working with no network,
    but a fresh deploy still wins over the cache for pages. */
-const CACHE = 'sprout-games-v4';
+const CACHE = 'sprout-games-v5';
 const SHELL = [
   './',
   './index.html',

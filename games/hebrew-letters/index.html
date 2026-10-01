@@ -106,11 +106,54 @@
     0%   { transform: scale(0.4) rotate(-8deg); opacity: 0; }
     100% { transform: scale(1) rotate(0deg); opacity: 1; }
   }
+  .card .cardTop {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(10px, 3vw, 28px);
+  }
   .card .big {
-    font-size: clamp(90px, 26vh, 230px);
+    font-size: clamp(80px, 22vh, 190px);
     font-weight: 700;
     line-height: 1;
-    margin-bottom: 4px;
+  }
+  .card .padWrap {
+    position: relative;
+    width: clamp(96px, 20vh, 170px);
+    height: clamp(96px, 20vh, 170px);
+    flex: 0 0 auto;
+  }
+  .card .padWrap canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: #fffdf6;
+    border: 3px dashed #d8cfe4;
+    border-radius: 18px;
+    touch-action: none;
+  }
+  .card .padClear {
+    position: absolute;
+    bottom: 6px;
+    inset-inline-end: 6px;
+    width: 32px; height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.06);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .card .padClear:active { transform: scale(0.9); }
+  .card .padHint {
+    position: absolute;
+    top: 50%; left: 0; right: 0;
+    transform: translateY(-50%);
+    text-align: center;
+    font-size: 13px;
+    color: #cdc3da;
+    pointer-events: none;
   }
   .card .pics {
     display: flex;
@@ -140,6 +183,88 @@
     font-weight: 700;
     color: #33242e;
   }
+  .card .picBtn img {
+    width: clamp(56px, 13vh, 112px);
+    height: clamp(56px, 13vh, 112px);
+    object-fit: cover;
+    border-radius: 18px;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.12);
+  }
+  .card .photoTile { position: relative; }
+  .card .photoTile .del {
+    position: absolute;
+    top: -2px; inset-inline-end: -2px;
+    width: 26px; height: 26px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(51,36,46,0.75);
+    color: #fff;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .card .addBtn {
+    border: 3px dashed #e0d7ea;
+    color: #8a7f93;
+    font-size: clamp(12px, 2vh, 16px);
+    font-weight: 700;
+    min-width: clamp(60px, 10vh, 86px);
+    min-height: clamp(60px, 10vh, 86px);
+    align-self: center;
+    justify-content: center;
+  }
+  .card .addBtn .plus { font-size: clamp(20px, 4vh, 32px); line-height: 1; }
+
+  /* naming a freshly taken photo */
+  .photoEditor {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(40, 20, 55, 0.6);
+    padding: 20px;
+  }
+  .photoEditor.show { display: flex; }
+  .photoEditor .pe-card {
+    background: #fff;
+    border-radius: 26px;
+    padding: 18px;
+    width: min(420px, 100%);
+    text-align: center;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.35);
+  }
+  .photoEditor img {
+    width: 100%;
+    max-height: 40vh;
+    object-fit: contain;
+    border-radius: 16px;
+    background: #f4efe5;
+  }
+  .photoEditor input {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px 12px;
+    font: inherit;
+    font-size: 17px;
+    text-align: center;
+    border: 2px solid #e6dfd2;
+    border-radius: 14px;
+  }
+  .photoEditor input:focus { outline: none; border-color: #cc5de8; }
+  .photoEditor .pe-row { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+  .photoEditor button {
+    border: none;
+    border-radius: 999px;
+    padding: 11px 20px;
+    font: inherit;
+    font-weight: 700;
+    font-size: 16px;
+    background: #efe7da;
+    cursor: pointer;
+  }
+  .photoEditor .pe-save { background: #51cf66; color: #06331a; }
   .card .name { font-size: clamp(18px, 3.4vh, 30px); color: #8a7f93; margin-top: 2px; }
   .card .again { margin-top: 10px; font-size: clamp(14px, 2.4vh, 19px); color: #b3a8bd; }
 
@@ -175,9 +300,27 @@ window.sproutConfig = {
   <div class="grid" id="grid"></div>
 </div>
 
+<input type="file" id="photoInput" accept="image/*" hidden>
+<div class="photoEditor" id="photoEditor">
+  <div class="pe-card">
+    <img id="peImg" alt="">
+    <input id="peWord" type="text" placeholder="איך קוראים לזה?" autocomplete="off">
+    <div class="pe-row">
+      <button id="peCancel">ביטול</button>
+      <button id="peSave" class="pe-save">שמירה</button>
+    </div>
+  </div>
+</div>
 <div class="card" id="card">
   <div class="inner">
-    <div class="big" id="cardLetter"></div>
+    <div class="cardTop">
+      <div class="big" id="cardLetter"></div>
+      <div class="padWrap no-replay">
+        <canvas id="cardPad"></canvas>
+        <div class="padHint" id="padHint">נסו לכתוב</div>
+        <button class="padClear" id="padClear" aria-label="מחיקה">🧽</button>
+      </div>
+    </div>
     <div class="pics" id="cardPics"></div>
     <div class="name" id="cardName"></div>
     <div class="again">הקישו על תמונה כדי לשמוע · הקישו בחוץ כדי לחזור</div>
@@ -191,7 +334,7 @@ const LETTERS = [
   { l: 'ב', id: 'bet',    name: 'בֵּית',   pics: [['בַּנָנָה', '🍌'], ['בַּיִת', '🏠'], ['בַּלּוֹן', '🎈']] },
   { l: 'ג', id: 'gimel',  name: 'גִימֶל',  pics: [['גְּלִידָה', '🍦'], ['גֶּזֶר', '🥕'], ['גִּיטָרָה', '🎸']] },
   { l: 'ד', id: 'dalet',  name: 'דָלֶת',   pics: [['דָּג', '🐟'], ['דֹּב', '🐻'], ['דֶּלֶת', '🚪']] },
-  { l: 'ה', id: 'he',     name: 'הֵא',     pics: [['הַר', '⛰️'], ['הֶלִיקוֹפְּטֶר', '🚁'], ['הַמְבּוּרְגֶּר', '🍔']] },
+  { l: 'ה', id: 'he',     name: 'הֵא',     pics: [['הַר', '⛰️'], ['הוֹדוּ', '🦃'], ['הֶגֶה', '🛞']] },
   { l: 'ו', id: 'vav',    name: 'וָו',     pics: [['וֶרֶד', '🌹'], ['וָפֶל', '🧇'], ['וִילוֹן', '🪟']] },
   { l: 'ז', id: 'zayin',  name: 'זַיִן',    pics: [['זֶבְּרָה', '🦓'], ['זְאֵב', '🐺'], ['זֵר', '💐']] },
   { l: 'ח', id: 'het',    name: 'חֵית',    pics: [['חָתוּל', '🐱'], ['חֲזִיר', '🐷'], ['חָלָב', '🥛']] },
@@ -320,6 +463,7 @@ function open(entry, tile) {
   current = entry;
   cardLetter.textContent = entry.l;
   cardLetter.style.color = tile.style.background;
+  padColour = tile.style.background || '#33242e';
   cardPics.innerHTML = '';
   entry.pics.forEach(([word, emoji]) => {
     const b = document.createElement('button');
@@ -329,18 +473,243 @@ function open(entry, tile) {
     b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); speakWord(word); });
     cardPics.appendChild(b);
   });
+  addPhotoButton(entry);
   cardName.textContent = entry.name;
   card.classList.add('show');
+  requestAnimationFrame(() => resetPad());
+  showPhotos(entry);
   speakLetter(entry);
   confetti();
 }
 
 card.addEventListener('pointerdown', e => {
+  if (e.target.closest('.no-replay')) return;     // drawing pad and its buttons
   e.preventDefault();
   if (e.target.closest('.inner')) { if (current) speakLetter(current); return; }
+  closeCard();
+});
+
+function closeCard() {
   card.classList.remove('show');
   current = null;
+  clearPad();                                     // the drawing goes with the card
   try { speechSynthesis.cancel(); } catch (err) { /* fine */ }
+}
+
+/* ---------- the square next to the letter: write it with a finger ----------
+   It is wiped whenever the card closes, so every letter starts on a clean sheet. */
+const pad = document.getElementById('cardPad');
+const pctx = pad.getContext('2d');
+const padHint = document.getElementById('padHint');
+let padColour = '#33242e';
+let padW = 0, padH = 0, padDrawing = false, padPointer = null;
+
+function resetPad() {
+  // offsetWidth is the layout size: getBoundingClientRect() would return the
+  // shrunken size while the card is still playing its pop animation
+  const dpr = window.devicePixelRatio || 1;
+  padW = Math.max(1, Math.round(pad.offsetWidth || pad.getBoundingClientRect().width));
+  padH = Math.max(1, Math.round(pad.offsetHeight || pad.getBoundingClientRect().height));
+  pad.width = Math.round(padW * dpr);
+  pad.height = Math.round(padH * dpr);
+  pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  pctx.clearRect(0, 0, padW, padH);
+  pctx.lineCap = 'round';
+  pctx.lineJoin = 'round';
+  padHint.hidden = false;
+}
+
+function clearPad() {
+  if (padW) pctx.clearRect(0, 0, padW, padH);
+  padHint.hidden = false;
+}
+
+function padPoint(e) {
+  const r = pad.getBoundingClientRect();
+  // correct for any transform the card happens to be under
+  const kx = r.width ? padW / r.width : 1;
+  const ky = r.height ? padH / r.height : 1;
+  return { x: (e.clientX - r.left) * kx, y: (e.clientY - r.top) * ky };
+}
+
+pad.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  e.stopPropagation();
+  padDrawing = true;
+  padPointer = e.pointerId;
+  padHint.hidden = true;
+  pad.setPointerCapture(e.pointerId);
+  const p = padPoint(e);
+  pctx.strokeStyle = padColour;
+  pctx.lineWidth = Math.max(8, padW * 0.075);
+  pctx.beginPath();
+  pctx.moveTo(p.x, p.y);
+  pctx.lineTo(p.x + 0.1, p.y);                  // a tap leaves a dot
+  pctx.stroke();
+});
+
+pad.addEventListener('pointermove', e => {
+  if (!padDrawing || e.pointerId !== padPointer) return;
+  e.stopPropagation();
+  const p = padPoint(e);
+  pctx.lineTo(p.x, p.y);
+  pctx.stroke();
+});
+
+function padEnd(e) {
+  if (e.pointerId !== padPointer) return;
+  padDrawing = false;
+  padPointer = null;
+}
+pad.addEventListener('pointerup', padEnd);
+pad.addEventListener('pointercancel', padEnd);
+window.addEventListener('resize', () => { if (current) resetPad(); });
+document.getElementById('padClear').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  e.stopPropagation();
+  clearPad();
+});
+
+/* ---------- photos the grown-ups add, kept on this device only ---------- */
+const DB_NAME = 'sproutLetters', DB_STORE = 'photos';
+function openDb() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) {
+        db.createObjectStore(DB_STORE, { keyPath: 'id', autoIncrement: true })
+          .createIndex('letter', 'letter');
+      }
+    };
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function photosFor(letterId) {
+  try {
+    const db = await openDb();
+    return await new Promise((res, rej) => {
+      const tx = db.transaction(DB_STORE, 'readonly');
+      const req = tx.objectStore(DB_STORE).index('letter').getAll(letterId);
+      req.onsuccess = () => res(req.result || []);
+      req.onerror = () => rej(req.error);
+    });
+  } catch (err) { return []; }
+}
+
+async function savePhoto(rec) {
+  const db = await openDb();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    const req = tx.objectStore(DB_STORE).add(rec);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function deletePhoto(id) {
+  const db = await openDb();
+  return new Promise(res => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).delete(id);
+    tx.oncomplete = () => res();
+    tx.onerror = () => res();
+  });
+}
+
+function photoTile(rec, entry) {
+  const b = document.createElement('button');
+  b.className = 'picBtn photoTile no-replay';
+  b.setAttribute('aria-label', rec.word || 'תמונה');
+  b.innerHTML = '<img alt="" src="' + rec.data + '">' +
+                '<span class="pw">' + (rec.word || '') + '</span>' +
+                '<button class="del" aria-label="מחיקת תמונה">\u2715</button>';
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.target.closest('.del')) {
+      deletePhoto(rec.id).then(() => { if (current === entry) showPhotos(entry); });
+      return;
+    }
+    if (rec.word) speakWord(rec.word);
+  });
+  return b;
+}
+
+function addPhotoButton(entry) {
+  const b = document.createElement('button');
+  b.className = 'picBtn addBtn no-replay';
+  b.innerHTML = '<span class="plus">\uFF0B</span><span>תמונה</span>';
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    pendingLetter = entry;
+    photoInput.value = '';
+    photoInput.click();
+  });
+  cardPics.appendChild(b);
+}
+
+async function showPhotos(entry) {
+  const rows = await photosFor(entry.id);
+  if (current !== entry) return;
+  cardPics.querySelectorAll('.photoTile').forEach(el => el.remove());
+  const addBtn = cardPics.querySelector('.addBtn');
+  rows.forEach(rec => cardPics.insertBefore(photoTile(rec, entry), addBtn));
+}
+
+/* shrink before storing, so a few photos per letter stay small */
+function shrink(file, max) {
+  return new Promise(res => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * k));
+      c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); res(null); };
+    img.src = url;
+  });
+}
+
+const photoInput = document.getElementById('photoInput');
+const photoEditor = document.getElementById('photoEditor');
+const peImg = document.getElementById('peImg');
+const peWord = document.getElementById('peWord');
+let pendingLetter = null, pendingData = null;
+
+photoInput.addEventListener('change', async () => {
+  const file = photoInput.files && photoInput.files[0];
+  if (!file || !pendingLetter) return;
+  pendingData = await shrink(file, 640);
+  if (!pendingData) return;
+  peImg.src = pendingData;
+  peWord.value = '';
+  photoEditor.classList.add('show');
+  setTimeout(() => peWord.focus(), 120);
+});
+
+document.getElementById('peCancel').addEventListener('click', () => {
+  photoEditor.classList.remove('show');
+  pendingData = null;
+});
+
+document.getElementById('peSave').addEventListener('click', async () => {
+  if (!pendingData || !pendingLetter) return;
+  const entry = pendingLetter;
+  try {
+    await savePhoto({ letter: entry.id, word: peWord.value.trim(), data: pendingData, at: Date.now() });
+  } catch (err) { /* storage full: the picture just does not stick */ }
+  photoEditor.classList.remove('show');
+  pendingData = null;
+  if (current === entry) showPhotos(entry);
 });
 
 /* ---------- confetti ---------- */

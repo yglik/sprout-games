@@ -14,7 +14,11 @@ or serve as a static file.
 - **[אותיות! / Hebrew Letters](games/hebrew-letters/index.html)** — tap a Hebrew letter to see three
   familiar pictures and hear the letter said out loud in a real recorded voice (`audio/`, one file per
   letter, listed in `audio/letters.json`). Tapping a picture says its word with the device's Hebrew
-  voice; if a recording is missing, the voice reads the letter too, so the game works either way.
+  voice; if a recording is missing, the voice reads the letter too, so the game works either way. The card
+  also holds a square to write the letter in with a finger (wiped when the card closes) and a **+ תמונה**
+  button, so a grown-up can photograph a real object for that letter with the camera or pick one from the
+  photo library. Those photos are resized and kept in IndexedDB **on that device only** — they are never
+  uploaded, so they do not sync between devices and clearing site data removes them.
 - **[Poster Paint!](games/poster-paint/index.html)** — paint with a single bristle brush
   and a 9-color palette; colors mix like real pigment (blue + yellow = green, and so on).
   The 🔬 button switches the mixing engine between the two models below.
